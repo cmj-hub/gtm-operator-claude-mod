@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.3.0] — 2026-10-05
+
+From step tracker to scoreboard: the mod now scores every draft with its pack's own scorer.
+
+### Added
+- Scores on the board: each step runs its pack's scorer and shows `37/100 · 11 fixes`, `pass` or `fail`, with a score trend.
+- Detail tab: score breakdown, fixes, refused phrases, the draft, and **Fix with Claude**.
+- `/gtm-score [pack]`: the scores as text, for surfaces where nothing draws.
+- Live scoring: saving a draft scores it and toasts the result.
+- `minScore` setting: an optional gate that refuses a draft below the score you set.
+- Voice check: phrases under `## Phrases I refuse` in SOUL.md are flagged in every draft.
+- Score history per project, kept across sessions.
+- Settings: `runScorers`, `minScore`, `packsDir`, `python`.
+- Claude reads which drafts fail and their first fix each turn.
+
+### Changed
+- The mod now runs local processes (the packs' scorers) and reads `HOME`; README and SECURITY.md list exactly what.
+
 ## [0.2.0] — 2026-10-05
 
 Meets the Claude Code mods docs, and gets a logo.
