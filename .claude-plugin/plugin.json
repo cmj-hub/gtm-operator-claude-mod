@@ -1,6 +1,6 @@
 {
   "name": "gtm-operator",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "GTM operator suite cockpit: live pipeline pane, next-step band and status, and a merge-never-overwrite guard on brand-config.json and SOUL.md.",
   "author": {
     "name": "Jay Mount Consulting",

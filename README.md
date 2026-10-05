@@ -2,6 +2,12 @@
 
 A live cockpit for the [GTM operator skill packs](https://github.com/cmj-hub/gtm-operator-skills). It reads the same files `/gtm:next` reads (`brand-config.json`, `gtm/`, `drafts/`) and keeps the suite's state in front of you and in front of Claude.
 
+## Requirements
+
+Claude Code v2.1.287 or later (the first release with mods). Tested with Claude Code 2.1.289. The mods API can change between releases; if something stops drawing, run `claude plugin validate` on this folder and check the debug log.
+
+Panes and the band draw in the terminal and the Desktop app's Code tab. In the VS Code extension, `claude -p` and cloud sessions the hooks still run: the guard works and `/gtm-board` answers in text.
+
 ## What it does
 
 Shown only in a project that has a `brand-config.json` or a `gtm/` folder.
@@ -14,7 +20,7 @@ Shown only in a project that has a `brand-config.json` or a `gtm/` folder.
 | Toast | When a step completes: `GTM: Value line (EVP) done. Next: /prospect-list:who-to-contact` |
 | System prompt | Each turn Claude reads what is done, what is next, and the suite's merge rules. |
 
-It re-checks every 30 seconds and after any write or shell command.
+It re-checks every 30 seconds and after any write or shell command. **Hide** on the band is remembered across sessions; **Show band** in the pane brings it back. Other mods' band rows stay visible above it.
 
 ## The guard: merge, never overwrite
 
@@ -24,7 +30,7 @@ It re-checks every 30 seconds and after any write or shell command.
 - leave `brand-config.json` as anything but one JSON object,
 - remove an existing `##` section from `SOUL.md`.
 
-The refusal names the fields and tells Claude to ask you first. Once you approve a change, run `/gtm-guard off`; `/gtm-guard on` restores it.
+The refusal names the fields and tells Claude to ask you first. If the check itself fails, the write to those two files is refused rather than let through. Once you approve a change, run `/gtm-guard off`; `/gtm-guard on` restores it.
 
 ## Install
 
@@ -78,8 +84,16 @@ claude plugin test .
 tsc -p .        # after Claude Code has loaded the mod once (it writes .claude-plugin/types/)
 ```
 
+## What it can reach
+
+What `claude plugin validate .` reports, so you can review it before installing:
+
+- **Hooks:** `session.start`, `classic.SessionStart` (after `/clear`, `/resume`, `/branch`), `command.run` (its two commands), `tool.call` (Write and Edit to guard, every call to refresh), `prompt.compose`, `ui.render` (the band and its own pane).
+- **Calls:** `$.fs.read`, `$.fs.list`, `$.fs.exists` (your project's `brand-config.json`, `SOUL.md`, `gtm/`, `drafts/`), `$.store.get` / `$.store.set` (one key, `isBandHidden`), and display calls.
+- **Never:** `$.fs.write`, `$.process`, `$.http.fetch`, `$.env`, `$.model`, `$.prompt.submit`. It writes nothing to your project, sends nothing over the network, and has no telemetry.
+
 ## Privacy
 
-Reads `brand-config.json`, `SOUL.md`, `gtm/` and `drafts/` in your project. Writes nothing to your project. No network, no telemetry. The function-hook API it uses is early access in Claude Code and may change between releases.
+The one thing it saves is whether you hid the band, in Claude Code's plugin store under `~/.claude/plugins/store/`. Each turn it adds a short section to Claude's system prompt with the suite's state (steps done, next command); that text comes from your own files. The function-hook API it uses is early access in Claude Code and may change between releases.
 
 MIT © Jay Mount Consulting
