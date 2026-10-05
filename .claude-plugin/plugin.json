@@ -1,13 +1,26 @@
 {
   "name": "gtm-operator",
-  "version": "0.1.0",
-  "description": "GTM operator suite cockpit: live pipeline pane, next-step band and status, and a merge-never-overwrite guard on brand-config.json and SOUL.md.",
+  "version": "0.2.0",
+  "description": "The GTM operator mod for Claude Code: the next go-to-market step above your prompt, a /gtm-board pane for all ten GTM skill packs, and a guard that keeps brand-config.json and SOUL.md merged, never overwritten.",
   "author": {
     "name": "Jay Mount Consulting",
     "url": "https://jaymountconsulting.com"
   },
-  "types": "./types/index.d.ts",
+  "homepage": "https://jaymountconsulting.com/skills",
   "repository": "https://github.com/cmj-hub/gtm-operator-claude-mod",
   "license": "MIT",
-  "homepage": "https://github.com/cmj-hub/gtm-operator-skills"
+  "keywords": [
+    "claude-code",
+    "claude-code-mod",
+    "gtm",
+    "go-to-market",
+    "sales",
+    "b2b",
+    "pipeline",
+    "brand-config"
+  ],
+  "icon": ".claude-plugin/icon.png",
+  "documentationUrl": "https://github.com/cmj-hub/gtm-operator-claude-mod#readme",
+  "supportUrl": "https://github.com/cmj-hub/gtm-operator-claude-mod/issues",
+  "types": "./types/index.d.ts"
 }

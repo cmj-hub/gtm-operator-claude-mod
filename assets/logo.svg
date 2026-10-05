@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <title>gtm-operator mod for Claude Code</title>
+  <defs>
+    <radialGradient id="glow"><stop offset="0" stop-color="#00D4FF" stop-opacity=".45"/><stop offset="1" stop-color="#00D4FF" stop-opacity="0"/></radialGradient>
+  </defs>
+  <rect width="1024" height="1024" fill="#060609"/>
+  <g transform="translate(512 512) scale(1.2) translate(-512 -536)">
+  <circle cx="293" cy="250" r="62" fill="#00D4FF"/><circle cx="439" cy="250" r="62" fill="#00D4FF"/><circle cx="585" cy="250" r="62" fill="#00D4FF"/><circle cx="731" cy="250" r="62" fill="#00D4FF"/><circle cx="366" cy="396" r="62" fill="#00D4FF"/><circle cx="512" cy="396" r="62" fill="#00D4FF"/><circle cx="658" cy="396" r="88" fill="url(#glow)"/><circle cx="658" cy="396" r="53" fill="none" stroke="#00D4FF" stroke-width="18"/><circle cx="658" cy="396" r="20" fill="#00D4FF"/><circle cx="439" cy="542" r="62" fill="#00D4FF" fill-opacity=".16"/><circle cx="585" cy="542" r="62" fill="#00D4FF" fill-opacity=".16"/><circle cx="512" cy="688" r="62" fill="#00D4FF" fill-opacity=".16"/>
+  <rect x="352" y="842" width="320" height="22" rx="11" fill="#252542"/>
+  <rect x="352" y="842" width="192" height="22" rx="11" fill="#00D4FF"/>
+  </g>
+</svg>

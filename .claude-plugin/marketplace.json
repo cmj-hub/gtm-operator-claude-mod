@@ -6,14 +6,14 @@
     "url": "https://jaymountconsulting.com"
   },
   "metadata": {
-    "description": "The gtm-operator mod for Claude Code: a live cockpit for the GTM operator skill packs."
+    "description": "The GTM operator mod for Claude Code: a live board for the ten GTM operator skill packs."
   },
   "plugins": [
     {
       "name": "gtm-operator",
       "source": "./",
-      "description": "GTM operator suite cockpit: live pipeline pane, next-step band and status, and a merge-never-overwrite guard on brand-config.json and SOUL.md.",
-      "category": "suite",
+      "description": "The GTM operator mod for Claude Code: the next go-to-market step above your prompt, a /gtm-board pane for all ten GTM skill packs, and a guard that keeps brand-config.json and SOUL.md merged, never overwritten.",
+      "category": "productivity",
       "homepage": "https://github.com/cmj-hub/gtm-operator-claude-mod"
     }
   ]

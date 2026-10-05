@@ -1,0 +1,70 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;box-sizing:border-box}
+html,body{width:1600px;height:900px;background:#060609;font-family:'JetBrains Mono',monospace;font-size:17px;line-height:1.55;color:#D7D7E0;-webkit-font-smoothing:antialiased}
+.win{position:absolute;inset:36px;border:1px solid #252542;border-radius:14px;background:#0B0B12;overflow:hidden;box-shadow:0 30px 80px #000c}
+.bar{height:38px;border-bottom:1px solid #1B1B2E;display:flex;align-items:center;gap:8px;padding:0 16px;color:#7A7A92;font-size:14px}
+.bar i{width:12px;height:12px;border-radius:50%;background:#2A2A40;display:inline-block}
+.bar span{margin-left:14px}
+.main{position:absolute;top:38px;left:0;right:0;bottom:0;display:flex}
+.tx{flex:1;padding:22px 28px;display:flex;flex-direction:column}
+.side{width:500px;border-left:1px solid #1B1B2E;padding:20px 24px}
+.dim{color:#6E6E86}.c{color:#00D4FF}.g{color:#10B981}.b{font-weight:700;color:#EAEAF0}.o{color:#CC4714}
+.user{color:#EAEAF0}.user:before{content:'> ';color:#6E6E86}
+.dot:before{content:'● ';color:#EAEAF0}
+.mod:before{content:'● ';color:#6E6E86}
+.gap{height:12px}.grow{flex:1}
+.band{white-space:nowrap;border-top:1px solid #1B1B2E;padding-top:10px;display:flex;gap:14px;align-items:center}
+.btn{color:#EAEAF0}.btn.p{color:#00D4FF}
+.prompt{margin-top:10px;border:1px solid #33334F;border-radius:6px;padding:9px 14px;color:#EAEAF0}
+.prompt:before{content:'> ';color:#6E6E86}
+.status{margin-top:8px;font-size:15px}
+.ttl{color:#EAEAF0;font-weight:700;margin-bottom:10px}
+.row{white-space:pre}
+.toast{position:absolute;top:58px;right:530px;background:#14142A;border:1px solid #2E2E50;border-radius:8px;padding:10px 16px;font-size:15px;color:#EAEAF0}
+</style></head><body><div class="win">
+<div class="bar"><i></i><i></i><i></i><span>~/acme · claude</span></div>
+<div class="toast">GTM: Value line (EVP) done. Next: /prospect-list:who-to-contact</div>
+<div class="main">
+<div class="tx">
+<div class="user">/evp:evp</div>
+<div class="gap"></div>
+<div class="dot">Three lines for three readers. The outreach line:</div>
+<div class="dim">&nbsp;&nbsp;"Catch renewal risk the week a new CRO starts, not the quarter after."</div>
+<div class="gap"></div>
+<div class="dot">Write(brand-config.json)</div>
+<div class="o">&nbsp;&nbsp;⎿ gtm-operator: this write would drop or change values that already exist</div>
+<div class="o">&nbsp;&nbsp;&nbsp;&nbsp;(icp.segment, psp.signal_anchors). Ask before changing a filled field.</div>
+<div class="gap"></div>
+<div class="dot">Update(brand-config.json)</div>
+<div class="dim">&nbsp;&nbsp;⎿ Added evp.primary, evp.tier, evp.proof</div>
+<div class="gap"></div>
+<div class="dot">I kept your ICP and PSP fields and only added the EVP block.</div>
+<div class="grow"></div>
+<div class="band"><span class="b">GTM 3/11</span><span>Next: <span class="b">/prospect-list:who-to-contact</span><span class="dim"> — no list yet</span></span><span class="btn p">[ Use ]</span><span class="btn">[ Board ]</span><span class="btn">[ Hide ]</span></div>
+<div class="prompt">&nbsp;</div>
+<div class="status dim">GTM 3/11 · next /prospect-list:who-to-contact</div>
+</div>
+<div class="side">
+<div class="ttl">GTM board</div>
+<div class="b">3/11 steps in place</div>
+<div class="row">Operator: Jay, Acme</div>
+<div class="row">Buyer: Series-B SaaS, 50-200, US</div>
+<div class="row">Pain: reps miss renewal signals</div>
+<div class="row">Value line: Catch renewal risk…</div>
+<div class="gap"></div>
+<div class="row dim">✓ 0. Setup</div>
+<div class="row dim">✓ 1. Profile (PSP)</div>
+<div class="row dim">✓ 2. Value line (EVP)</div>
+<div class="row b">▸ 3. Prospect list  <span class="c">/prospect-list:…</span></div>
+<div class="row">· 4. First touch</div>
+<div class="row">· 5. Offer</div>
+<div class="row">· 6. Pricing</div>
+<div class="row">· 7. Landing page</div>
+<div class="row">· 8. Email sequence</div>
+<div class="row">· 9. Findability (GEO)</div>
+<div class="row">· 10. Founder posts</div>
+<div class="gap"></div>
+<div><span class="btn p">[ Fill next ]</span> <span class="btn">[ Refresh ]</span> <span class="btn">[ Show band ]</span></div>
+</div></div></div></body></html>

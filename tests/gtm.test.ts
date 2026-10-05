@@ -15,10 +15,11 @@ const CONFIG = {
 }
 
 // A project with setup and psp done, served beneath the plugin.
-function project(on: On) {
+function project(on: On, failedRoots = 0) {
   const files: Record<string, string> = { 'brand-config.json': JSON.stringify(CONFIG, null, 2) }
   const strip = (path: string) => path.replace(`${ROOT}/`, '')
-  on('session.root', () => ({ value: ROOT }))
+  let roots = 0
+  on('session.root', () => (++roots <= failedRoots ? { deny: 'unavailable' } : { value: ROOT }))
   on('ui.status', () => ({ value: undefined }))
   on('ui.open', () => ({ value: { isPlaced: true } }))
   on('clock.now', () => ({ value: Date.UTC(2026, 9, 5) }))
@@ -95,6 +96,8 @@ test('the board pane and the band draw the next step on terminal and desktop', a
     filled = e.text
     return { isFilled: true }
   })
+  // Another mod's band row, which ours must keep
+  on('ui.render', () => ({ type: 'Text', props: {}, children: ['drawn by another mod'] }))
   await $.command.run({ command: 'gtm-board', ...RUN })
 
   const site = { scroll: { offset: 0, bodyRows: 30 }, view: {} }
@@ -118,7 +121,46 @@ test('the board pane and the band draw the next step on terminal and desktop', a
       props: { hasSurvey: false, isWorking: false, maxRows: 3, bodyColumns: 100, ...site },
     })
     expect(await band.find({ type: 'Text', text: 'GTM 2/11' })).toBeDefined()
+    expect(await band.find({ type: 'Text', text: 'drawn by another mod' })).toBeDefined()
     await band.unmount()
     await pane.unmount()
   }
+})
+
+test('after /clear the board and the hidden band come back from the files and the store', async ($, on) => {
+  project(on)
+  on('store.get', ($, e) => ({ value: e.key === 'isBandHidden' ? true : undefined }))
+  on('classic.SessionStart', () => ({}))
+  on('ui.render', () => ({ type: 'Text', props: {}, children: ['engine band'] }))
+
+  await $.classic.SessionStart({ source: 'clear' })
+
+  const band = await $.ui.mount({
+    plugin: 'gtm-operator',
+    surface: 'terminal',
+    component: 'AbovePrompt',
+    props: { hasSurvey: false, isWorking: false, maxRows: 3, bodyColumns: 100, scroll: { offset: 0, bodyRows: 3 }, view: {} },
+  })
+  expect(await band.find({ type: 'Text', text: /GTM \d+\/11/ })).toBeUndefined()
+  const pane = await $.ui.mount({
+    plugin: 'gtm-operator',
+    surface: 'terminal',
+    component: 'Pane',
+    requestId: 'gtm-board',
+    props: { title: 'GTM board', isFocused: false, bodyColumns: 60, placement: 'dock', scroll: { offset: 0, bodyRows: 30 }, view: {} },
+  })
+  expect(await pane.find({ type: 'Text', text: /2\/11 steps in place/ })).toBeDefined()
+})
+
+test('a guard that fails refuses the write to brand-config.json', async ($, on) => {
+  // The first root lookup fails inside the guard; the catch handler's succeeds
+  project(on, 1)
+  let isWritten = false
+  on('tool.call', () => {
+    isWritten = true
+    return { result: {}, text: 'written' }
+  })
+  const ran = await $.tool.call({ tool: 'Write', file_path: `${ROOT}/brand-config.json`, content: '{}' })
+  expect(ran.deny).toContain('the merge check on brand-config.json failed')
+  expect(isWritten).toBe(false)
 })

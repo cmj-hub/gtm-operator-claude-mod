@@ -83,12 +83,29 @@ async function refresh($: $, isAnnounced = false): Promise<GtmBoard> {
   return found
 }
 
+// The band preference lasts across sessions; the board is rebuilt from the files.
+async function restore($: $): Promise<void> {
+  const isHidden = (await $.store.get('isBandHidden')) === true
+  await update($, isBandHidden, () => isHidden)
+  await refresh($)
+}
+
+async function setBandHidden($: $, isHidden: boolean): Promise<void> {
+  await $.store.set('isBandHidden', isHidden)
+  await update($, isBandHidden, () => isHidden)
+}
+
 function guardMessage(file: string, lost: string[]): string {
   const shown = lost.slice(0, 6).join(', ') + (lost.length > 6 ? `, +${lost.length - 6} more` : '')
   return `gtm-operator: this write to ${file} would drop or change values that already exist (${shown}). ` +
     'The GTM suite merges, never overwrites: keep every existing key and value, change only the fields ' +
     'this pack owns, and ask the person before changing a field that already has a value. ' +
     'If they confirmed the change, they can run /gtm-guard off and you can retry.'
+}
+
+function failedGuard(file: string, kind: string): string {
+  return `gtm-operator: the merge check on ${file} failed (${kind}), so this write was not made. ` +
+    'Read the file again and retry with a change that keeps every existing value.'
 }
 
 async function guard($: $, path: string, after: string): Promise<string | undefined> {
@@ -118,15 +135,23 @@ export const register: Register = on => {
       name: 'gtm-board',
       description: 'GTM suite board: what is done, and the next pack to run',
       argumentHint: '[refresh]',
+      immediate: true,
     })
     await $.command.register({
       name: 'gtm-guard',
       description: 'Turn the brand-config.json / SOUL.md overwrite guard on or off',
       argumentHint: '[on|off]',
+      immediate: true,
     })
-    await refresh($)
+    await restore($)
     $.clock.every(30_000, () => void refresh($, true))
 
+    return next(e)
+  })
+
+  // /clear, /resume and /branch reset $.state without a new session.start.
+  on('classic.SessionStart', { source: ['clear', 'resume', 'fork'] }, async ($, e, next) => {
+    await restore($)
     return next(e)
   })
 
@@ -159,6 +184,9 @@ export const register: Register = on => {
   on('tool.call', { tool: 'Write' }, async ($, e, next) => {
     const reason = await guard($, e.file_path, e.content)
     return reason === undefined ? next(e) : { deny: reason }
+  }).catch(async ($, e, next) => {
+    const rel = relative(e.file_path, await $.session.root())
+    return rel === CONFIG || rel === SOUL ? { deny: failedGuard(rel, next.error.kind) } : next(e)
   })
 
   on('tool.call', { tool: 'Edit' }, async ($, e, next) => {
@@ -171,6 +199,9 @@ export const register: Register = on => {
       : applyEdit(before, e.old_string, e.new_string, e.replace_all === true)
     const reason = after === undefined ? undefined : await guard($, e.file_path, after)
     return reason === undefined ? next(e) : { deny: reason }
+  }).catch(async ($, e, next) => {
+    const rel = relative(e.file_path, await $.session.root())
+    return rel === CONFIG || rel === SOUL ? { deny: failedGuard(rel, next.error.kind) } : next(e)
   })
 
   // Anything that may have written the suite's files redraws the board.
@@ -209,25 +240,29 @@ export const register: Register = on => {
     }
 
     const { Box, Button, Text } = $.ui.resolve(e)
+    const theirs = await next(e)
     const step = nextStep(found)
     const count = `GTM ${doneCount(found)}/${found.steps.length}`
 
     return (
-      <Box flexDirection="row" gap={1}>
-        <Text bold>{count}</Text>
-        {step === undefined
-          ? <Text dimColor>every step in place</Text>
-          : <Text>Next: <Text bold>{step.command}</Text><Text dimColor> — {step.why}</Text></Text>}
-        {step !== undefined && (
-          <Button
-            key="use"
-            label="Use"
-            variant="primary"
-            onPress={() => $.prompt.fill({ text: step.command })}
-          />
-        )}
-        <Button key="board" label="Board" onPress={() => $.ui.open({ id: PANE, title: 'GTM board' })} />
-        <Button key="hide" label="Hide" onPress={() => update($, isBandHidden, () => true)} />
+      <Box flexDirection="column">
+        {theirs}
+        <Box flexDirection="row" gap={1}>
+          <Text bold>{count}</Text>
+          {step === undefined
+            ? <Text dimColor>every step in place</Text>
+            : <Text>Next: <Text bold>{step.command}</Text><Text dimColor> — {step.why}</Text></Text>}
+          {step !== undefined && (
+            <Button
+              key="use"
+              label="Use"
+              variant="primary"
+              onPress={() => $.prompt.fill({ text: step.command })}
+            />
+          )}
+          <Button key="board" label="Board" onPress={() => $.ui.open({ id: PANE, title: 'GTM board' })} />
+          <Button key="hide" label="Hide" onPress={() => setBandHidden($, true)} />
+        </Box>
       </Box>
     )
   })
@@ -293,7 +328,7 @@ export const register: Register = on => {
             />
           )}
           <Button key="refresh" label="Refresh" onPress={() => refresh($)} />
-          <Button key="band" label="Show band" onPress={() => update($, isBandHidden, () => false)} />
+          <Button key="band" label="Show band" onPress={() => setBandHidden($, false)} />
         </Box>
       </Box>
     )

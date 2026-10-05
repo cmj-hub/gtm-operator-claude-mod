@@ -1,20 +1,40 @@
-# gtm-operator — a Claude Code mod for the GTM operator suite
+<p align="center">
+  <img src="./assets/lockup.png" width="880" alt="GTM operator mod for Claude Code. The next go-to-market step above your prompt, a live board of all ten GTM skill packs, and a guard that keeps Claude from overwriting your brand config.">
+</p>
 
-A live cockpit for the [GTM operator skill packs](https://github.com/cmj-hub/gtm-operator-skills). It reads the same files `/gtm:next` reads (`brand-config.json`, `gtm/`, `drafts/`) and keeps the suite's state in front of you and in front of Claude.
+# GTM operator mod for Claude Code
+
+The GTM operator mod is a Claude Code mod that shows which go-to-market step you are on, names the next skill pack to run, and keeps Claude from overwriting the brand config every pack shares.
+
+## In 60 seconds
+
+```text
+/plugin marketplace add cmj-hub/gtm-operator-skills
+/plugin install gtm-operator@gtm-operator-skills
+/gtm-board
+```
+
+The band above your prompt now reads `GTM 2/11  Next: /evp:evp — no value line yet`. Press **Use** and the command is in your prompt.
+
+Part of the GTM operator suite — `/plugin install gtm@gtm-operator-skills` installs the ten skill packs this mod tracks.
+
+> `/gtm:next` tells you the next step when you ask. The mod tells you before you ask, and stops the write that would have cost you your ICP.
+
+<p align="center">
+  <img src="./assets/demo.png" alt="Illustration of the gtm-operator mod in a Claude Code terminal: a refused write to brand-config.json, the band above the prompt reading GTM 3/11 Next /prospect-list:who-to-contact, and the GTM board pane listing the eleven steps with three done." width="100%">
+</p>
 
 ## What it does
 
-Shown only in a project that has a `brand-config.json` or a `gtm/` folder.
-
-| Where | What |
+| Where | What you see |
 |---|---|
-| Band above the prompt | `GTM 2/11  Next: /evp:evp — no value line yet  [Use] [Board] [Hide]`. **Use** puts the command in your prompt. |
+| Band above the prompt | `GTM 2/11  Next: /evp:evp — no value line yet  [Use] [Board] [Hide]`. Other mods' band rows stay above it. |
 | Status line | `GTM 2/11 · next /evp:evp` |
-| `/gtm-board` | A pane: operator, buyer, pain, value line, the 11 steps (✓ done, ▸ next, · open), and the install line for the next pack. |
+| `/gtm-board` | A pane: operator, buyer, pain, value line, the 11 steps (✓ done, ▸ next, · open), and the install line for the next pack |
 | Toast | When a step completes: `GTM: Value line (EVP) done. Next: /prospect-list:who-to-contact` |
-| System prompt | Each turn Claude reads what is done, what is next, and the suite's merge rules. |
+| Claude's system prompt | Each turn Claude reads what is done, what is next, and the suite's merge rules |
 
-It re-checks every 30 seconds and after any write or shell command.
+It re-checks every 30 seconds and after any write or shell command. **Hide** is remembered across sessions; **Show band** in the pane brings it back.
 
 ## The guard: merge, never overwrite
 
@@ -24,22 +44,7 @@ It re-checks every 30 seconds and after any write or shell command.
 - leave `brand-config.json` as anything but one JSON object,
 - remove an existing `##` section from `SOUL.md`.
 
-The refusal names the fields and tells Claude to ask you first. Once you approve a change, run `/gtm-guard off`; `/gtm-guard on` restores it.
-
-## Install
-
-```text
-/plugin marketplace add cmj-hub/gtm-operator-claude-mod
-/plugin install gtm-operator@gtm-operator-claude-mod
-```
-
-Or from a clone, for one session:
-
-```bash
-claude --plugin-dir /path/to/gtm-operator-claude-mod
-```
-
-Pairs with the suite: `/plugin install gtm@gtm-operator-skills`.
+The refusal names the fields and tells Claude to ask you first. If the check itself fails, the write to those two files is refused rather than let through. Once you approve a change, run `/gtm-guard off`; `/gtm-guard on` restores it.
 
 ## The steps it walks
 
@@ -59,16 +64,76 @@ Same order and checks as [`/gtm:next`](https://github.com/cmj-hub/gtm-operator-s
 | 9 Findability | `gtm/findability.json` | `/geo:geo` |
 | 10 Founder posts | a file in `drafts/` from the last 7 days | `/founder-brand:founder-brand` |
 
-## Layout
+## Install
 
+From the suite marketplace (above), or from this repo's own marketplace:
+
+```text
+/plugin marketplace add cmj-hub/gtm-operator-claude-mod
+/plugin install gtm-operator@gtm-operator-claude-mod
 ```
-.claude-plugin/plugin.json       manifest
-.claude-plugin/marketplace.json  makes this repo installable as a marketplace
-hooks/register.tsx               the hooks: band, pane, commands, guard, prompt section
-hooks/gtm.ts                     pure logic: step walk, merge check, SOUL.md check
-types/index.d.ts                 the mod's $.state contract
-tests/gtm.test.ts                claude plugin test suite
+
+From a clone, for one session:
+
+```bash
+claude --plugin-dir /path/to/gtm-operator-claude-mod
 ```
+
+## Requirements
+
+Claude Code v2.1.287 or later (the first release with mods). Tested with Claude Code 2.1.289. The mods API can change between releases; if something stops drawing, run `claude plugin validate` on this folder and check the debug log.
+
+Panes and the band draw in the terminal and the Desktop app's Code tab. In the VS Code extension, `claude -p` and cloud sessions the hooks still run: the guard works and `/gtm-board` answers in text.
+
+## What this mod will not do
+
+It will not run a pack for you, write your drafts, or pick this quarter's buyer. It reads the files the packs write and tells you what is missing. It sends nothing, posts nothing, and changes no file in your project.
+
+## What is a Claude Code mod?
+
+A mod is a Claude Code plugin whose code runs inside Claude Code: it can draw a pane or a band above the prompt, add commands, and step into a tool call before it runs. A skill gives Claude instructions; a mod changes what Claude Code shows and allows. See [Mods overview](https://code.claude.com/docs/en/plugins/mods).
+
+## Do I need the ten skill packs?
+
+No, but the board is empty without them. The mod tracks the files the packs write. With none installed it names `/gtm:setup` and the install line.
+
+## How is this different from `/gtm:next`?
+
+`/gtm:next` is a skill: you ask, Claude reads your files, and names one command. The mod keeps that answer on screen without a turn, updates it when a file changes, and adds the guard on `brand-config.json` and `SOUL.md`.
+
+## Will it block Claude from editing my brand config?
+
+Only edits that drop or change a value you already have. New fields go through. When you want to change a filled value, say so, run `/gtm-guard off`, and Claude retries.
+
+## Does it work in Cursor, Codex or the VS Code extension?
+
+Mods run in Claude Code only. In the VS Code extension the guard and `/gtm-board` work, but nothing draws. The ten skill packs work in Cursor, Codex and the rest through the [skills CLI](https://skills.sh).
+
+## What it can reach
+
+What `claude plugin validate .` reports, so you can review it before installing:
+
+- **Hooks:** `session.start`, `classic.SessionStart` (after `/clear`, `/resume`, `/branch`), `command.run` (its two commands), `tool.call` (Write and Edit to guard, every call to refresh), `prompt.compose`, `ui.render` (the band and its own pane).
+- **Calls:** `$.fs.read`, `$.fs.list`, `$.fs.exists` (your project's `brand-config.json`, `SOUL.md`, `gtm/`, `drafts/`), `$.store.get` / `$.store.set` (one key, `isBandHidden`), and display calls.
+- **Never:** `$.fs.write`, `$.process`, `$.http.fetch`, `$.env`, `$.model`, `$.prompt.submit`.
+
+## On the site
+
+- [Skill packs catalog](https://jaymountconsulting.com/skills) — install paths + every pack
+- [GTM operator suite](https://github.com/cmj-hub/gtm-operator-skills) — the ten packs this mod tracks
+
+## Free, no signup
+
+- **[All 30+ free tools](https://jaymountconsulting.com/prototypes)** — the same jobs the packs do, hosted. No account, no key.
+- [Frameworks](https://jaymountconsulting.com/frameworks) — the written method behind each pack
+
+## Free, by email
+
+[**Growth Audit**](https://jaymountconsulting.com/growth-audit) — where your go-to-market stack is leaking, sent to your inbox.
+
+That one does ask for an email, and it enrols you in a short follow-up on the same topic. Unsubscribe whenever.
+
+[**The Friday Signal**](https://jaymountconsulting.com/newsletter/signal) — one free edition a week on building GTM systems that compound. No pitch in it.
 
 ## Develop
 
@@ -78,8 +143,16 @@ claude plugin test .
 tsc -p .        # after Claude Code has loaded the mod once (it writes .claude-plugin/types/)
 ```
 
-## Privacy
+`hooks/register.tsx` holds the hooks, `hooks/gtm.ts` the step walk and merge checks, `types/index.d.ts` the `$.state` contract, `tests/gtm.test.ts` the tests. The images in `assets/` are rendered from `spec.json` (with `card.mjs`), `lockup.html`, `demo.html` and `logo.svg`.
 
-Reads `brand-config.json`, `SOUL.md`, `gtm/` and `drafts/` in your project. Writes nothing to your project. No network, no telemetry. The function-hook API it uses is early access in Claude Code and may change between releases.
+## Privacy and security
 
-MIT © Jay Mount Consulting
+The one thing it saves is whether you hid the band, in Claude Code's plugin store under `~/.claude/plugins/store/`. Each turn it adds a short section to Claude's system prompt with the suite's state; that text comes from your own files. No network, no telemetry, no credentials. See [SECURITY.md](SECURITY.md).
+
+## License
+
+MIT. See [LICENSE](./LICENSE).
+
+## About
+
+Built by [Jay Mount Consulting](https://jaymountconsulting.com).
