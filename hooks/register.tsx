@@ -1,7 +1,9 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, PluginOptions, Register } from 'claude-code'
 
-import type { GtmBoard, History, PackId, Score, Scores, Tab } from '../types'
+import type { Finding, GtmBoard, History, PackId, Score, Scores, Tab, ToolRuns, ViewId } from '../types'
+import { allFindings, hashOf } from './drift'
+import type { DraftFile, Snapshot, Upstream } from './drift'
 import {
   PACKS as INSTALL_NAMES,
   applyEdit,
@@ -21,6 +23,7 @@ import { PACKS, packById, packForPath } from './packs'
 import type { PackDef, ScorerInput } from './packs'
 import { fixPrompt, normalize, scoreLabel } from './score'
 import { draftText, refusedPhrases, voiceHits } from './voice'
+import { coldEmailView, evpLadder, founderView, geoView, money, pricingView, prospectBoard, shareBar } from './views'
 
 const PANE = 'gtm-board'
 const CONFIG = 'brand-config.json'
@@ -34,6 +37,9 @@ const tab = atom({ plugin: 'gtm-operator', key: 'tab' } as const, 'board')
 const selected = atom({ plugin: 'gtm-operator', key: 'selected' } as const, 'psp')
 const isBandHidden = atom({ plugin: 'gtm-operator', key: 'isBandHidden' } as const, false)
 const isGuardOff = atom({ plugin: 'gtm-operator', key: 'isGuardOff' } as const, false)
+const findings = atom({ plugin: 'gtm-operator', key: 'findings' } as const, [])
+const view = atom({ plugin: 'gtm-operator', key: 'view' } as const, 'pricing')
+const toolRuns = atom({ plugin: 'gtm-operator', key: 'toolRuns' } as const, {})
 
 type $ = EngineInterface
 
@@ -243,6 +249,103 @@ async function scoreAll($: $, settings: Settings, only?: readonly PackDef[], isF
   return changed
 }
 
+// --- Cross-pack checks ------------------------------------------------------
+
+type BlockTimes = Partial<Record<Upstream, { hash: string; at: number }>>
+
+const UPSTREAM_FIELDS: Record<Upstream, string> = { psp: 'psp', evp: 'evp', price: 'pricing' }
+
+/** Notes when the PSP, EVP and pricing blocks change; the first sighting counts as unknown (0). */
+async function blockTimes($: $, root: string, config: Record<string, unknown>): Promise<Partial<Record<Upstream, number>>> {
+  const key = `blocks:${root}`
+  const saved = ((await $.store.get(key)) ?? {}) as BlockTimes
+  const now = await $.clock.now()
+  const next: BlockTimes = {}
+  const times: Partial<Record<Upstream, number>> = {}
+  for (const up of Object.keys(UPSTREAM_FIELDS) as Upstream[]) {
+    const hash = hashOf(field(config as never, UPSTREAM_FIELDS[up]))
+    const was = saved[up]
+    const at = was === undefined ? 0 : was.hash === hash ? was.at : now
+    next[up] = { hash, at }
+    times[up] = at
+  }
+  if (JSON.stringify(next) !== JSON.stringify(saved)) await $.store.set(key, next)
+  return times
+}
+
+async function snapshot($: $): Promise<Snapshot> {
+  const root = await projectRoot($)
+  const config = parseConfig(await readText($, `${root}/${CONFIG}`).catch(() => undefined)) ?? {}
+  const drafts: Partial<Record<PackId, DraftFile>> = {}
+  for (const pack of PACKS) {
+    if (pack.draft.kind !== 'file') continue
+    const path = `${root}/${pack.draft.path}`
+    const stat = await $.fs.stat(path).catch(() => undefined)
+    if (stat?.kind !== 'file') continue
+    drafts[pack.id] = { text: (await $.fs.read(path).catch(() => '')) as string, mtimeMs: stat.mtimeMs }
+  }
+  const changedAt = await blockTimes($, root, config)
+  const priceFile = drafts.price?.mtimeMs ?? 0
+  return { config, drafts, changedAt: { ...changedAt, price: Math.max(changedAt.price ?? 0, priceFile) } }
+}
+
+async function checkDrift($: $): Promise<Finding[]> {
+  const found = allFindings(await snapshot($))
+  await update($, findings, () => found)
+  return found
+}
+
+// --- Extra pack tools behind the views -------------------------------------
+
+/** A tool script next to a pack's scorer (same install), or undefined. */
+async function toolPath($: $, settings: Settings, pack: PackDef, rel: string): Promise<string | undefined> {
+  if (scorerPaths.size === 0) await locateScorers($, settings)
+  const scorer = scorerPaths.get(pack.id)
+  if (!scorer) return undefined
+  const fileName = rel.slice(rel.lastIndexOf('/') + 1)
+  const candidates = scorer.endsWith(pack.scorer)
+    ? [`${scorer.slice(0, -pack.scorer.length)}${rel}`]
+    : [`${scorer.slice(0, scorer.lastIndexOf('/'))}/${fileName}`]
+  for (const path of candidates) if (await $.fs.exists(path).catch(() => false)) return path
+  return undefined
+}
+
+async function runTool($: $, settings: Settings, name: string, packId: PackId, rel: string, args: string[]): Promise<void> {
+  const pack = packById(packId)
+  if (pack === undefined || !settings.runScorers) return
+  const path = await toolPath($, settings, pack, rel)
+  const at = await $.clock.now()
+  const ran = path === undefined
+    ? { exitCode: -1, stdout: '', stderr: `${rel} not found next to ${pack.repo}'s scorer` }
+    : await $.process.run([settings.python, path, ...args, '--json'], { timeoutMs: SCORER_TIMEOUT_MS })
+      .catch((error: unknown) => ({ exitCode: -1, stdout: '', stderr: String(error) }))
+  await update($, toolRuns, all => ({ ...all, [name]: { at, exitCode: ran.exitCode, stdout: ran.stdout, stderr: ran.stderr } }))
+}
+
+/** Runs what a view needs, then shows it. The deliverability check only runs when asked. */
+async function loadView($: $, settings: Settings, id: ViewId, isDeliverability = false): Promise<void> {
+  const root = await projectRoot($)
+  const has = (rel: string) => $.fs.exists(`${root}/${rel}`).catch(() => false)
+  if (id === 'pricing') {
+    if (await has('gtm/waterfall.csv')) await runTool($, settings, 'waterfall', 'price', 'scripts/pocket_price_waterfall.py', ['--file', `${root}/gtm/waterfall.csv`])
+    if (await has('gtm/tiers.json')) await runTool($, settings, 'decoy', 'price', 'scripts/decoy_validator.py', ['--file', `${root}/gtm/tiers.json`])
+  }
+  if (id === 'cold-email') {
+    if (await has('gtm/letter.json')) {
+      await runTool($, settings, 'spam', 'letter', 'scripts/spam_word_lint.py', ['--file', `${root}/gtm/letter.json`])
+      await runTool($, settings, 'subject', 'letter', 'scripts/score_subject_line.py', ['--file', `${root}/gtm/letter.json`])
+    }
+    if (await has('gtm/replies.jsonl')) await runTool($, settings, 'replies', 'letter', 'scripts/score_reply.py', ['--file', `${root}/gtm/replies.jsonl`])
+    if (isDeliverability) {
+      const config = parseConfig(await readText($, `${root}/${CONFIG}`).catch(() => undefined)) ?? {}
+      const domain = coldEmailView({ letter: undefined, config, now: 0 }).domain
+      if (domain !== '') await runTool($, settings, 'deliverability', 'letter', 'scripts/check_deliverability.py', ['--domain', domain])
+    }
+  }
+  await update($, view, () => id)
+  await update($, tab, () => 'views')
+}
+
 function failingCount(all: Scores): number {
   return Object.values(all).filter(one => one?.status === 'fail' || (one?.voice?.length ?? 0) > 0).length
 }
@@ -253,14 +356,20 @@ function statusLine(found: GtmBoard, all: Scores): string | undefined {
   const tail = next === undefined ? 'all steps done' : `next ${next.command}`
   const failing = failingCount(all)
   const fixes = failing > 0 ? ` · ${failing} draft${failing === 1 ? '' : 's'} to fix` : ''
-  return `GTM ${doneCount(found)}/${found.steps.length}${fixes} · ${tail}`
+  const warnings = found.hasProject && lastFindings > 0 ? ` · ${lastFindings} warning${lastFindings === 1 ? '' : 's'}` : ''
+  return `GTM ${doneCount(found)}/${found.steps.length}${fixes}${warnings} · ${tail}`
 }
+
+let lastFindings = 0
 
 async function refresh($: $, settings: Settings, isAnnounced = false): Promise<GtmBoard> {
   const found = await scan($)
   const before = await read($, board)
   await update($, board, () => found)
-  if (found.hasProject) await scoreAll($, settings)
+  if (found.hasProject) {
+    await scoreAll($, settings)
+    lastFindings = (await checkDrift($)).length
+  }
   $.ui.status(statusLine(found, await read($, scores)))
 
   if (isAnnounced && before !== null) {
@@ -368,6 +477,143 @@ function bar(value: number, max: number, width: number): string {
   return `${'█'.repeat(filled)}${'░'.repeat(Math.max(0, width - filled))}`
 }
 
+type RenderEvent = Parameters<EngineInterface['ui']['resolve']>[0]
+
+async function draftFile($: $, rel: string): Promise<DraftFile | undefined> {
+  const path = `${await projectRoot($)}/${rel}`
+  const stat = await $.fs.stat(path).catch(() => undefined)
+  if (stat?.kind !== 'file') return undefined
+  return { text: (await $.fs.read(path).catch(() => '')) as string, mtimeMs: stat.mtimeMs }
+}
+
+/** One pack view, drawn from the pack's files and its tools' last output. */
+async function drawView($: $, e: RenderEvent, settings: Settings, id: ViewId, width: number) {
+  const { Box, Button, Text } = $.ui.resolve(e)
+  const runs = await read($, toolRuns)
+  const root = await projectRoot($)
+  const config = parseConfig(await readText($, `${root}/${CONFIG}`).catch(() => undefined)) ?? {}
+  const now = await $.clock.now()
+  const line = (text: string, props: { bold?: boolean; dimColor?: boolean; color?: string } = {}) =>
+    <Text {...props}>{cut(text, width)}</Text>
+  const empty = (text: string) => <Box flexDirection="column">{line(text, { dimColor: true })}</Box>
+
+  if (id === 'pricing') {
+    const priceView = pricingView(runs.waterfall?.stdout, runs.decoy?.stdout, await draftFile($, 'gtm/price.json'))
+    if (priceView.customers.length === 0 && priceView.checks.length === 0 && priceView.contrastSet.length === 0) {
+      return empty('No pricing data yet. /pricing:pricing writes gtm/price.json; the waterfall reads gtm/waterfall.csv, the decoy check gtm/tiers.json.')
+    }
+    const barWidth = Math.max(8, Math.min(30, width - 40))
+    return (
+      <Box flexDirection="column">
+        {priceView.valueMetric !== '' && line(`Value metric: ${priceView.valueMetric}`)}
+        {priceView.contrastSet.length > 0 && line(`Contrast set: ${priceView.contrastSet.join(' · ')}`)}
+        {priceView.customers.length > 0 && <Text> </Text>}
+        {priceView.customers.length > 0 && line(`Pocket-price waterfall: ${money(priceView.totalPocket)} kept of ${money(priceView.totalList)} list`, { bold: true })}
+        {priceView.customers.map(one => line(`${one.id.padEnd(10)} ${shareBar(one.pocket, Math.max(one.list, one.pocket), barWidth)} ${money(one.pocket)} of ${money(one.list)} (${one.leakPct >= 0 ? '-' : '+'}${Math.abs(one.leakPct)}%)`))}
+        {priceView.byStep.length > 0 && line(`Biggest leaks: ${priceView.byStep.slice(0, 3).map(step => `${step.name} ${money(step.leak)}`).join(', ')}`, { color: 'yellow' })}
+        {priceView.checks.length > 0 && <Text> </Text>}
+        {priceView.checks.length > 0 && line(`Tier contrast check${priceView.tiersScore !== undefined ? `: ${priceView.tiersScore}/100` : ''}`, { bold: true })}
+        {priceView.checks.map(check => line(`${check.passed ? '✓' : '✗'} ${check.rule}: ${check.detail}`, check.passed ? { dimColor: true } : { color: 'yellow' }))}
+      </Box>
+    )
+  }
+
+  if (id === 'prospects') {
+    const board = prospectBoard(await draftFile($, 'gtm/list.json'))
+    const total = board.call.length + board.hold.length + board.drop.length + board.unscored.length
+    if (total === 0) return empty('No prospects yet. Run /prospect-list:who-to-contact.')
+    const column = (title: string, items: { title: string; signal: string }[], color?: string) => (
+      <Box flexDirection="column">
+        {line(`${title} (${items.length})`, { bold: true, ...(color ? { color } : {}) })}
+        {items.slice(0, 8).map(one => line(`  ${one.title}${one.signal ? ` — ${one.signal}` : ''}`))}
+        {items.length > 8 && line(`  +${items.length - 8} more`, { dimColor: true })}
+      </Box>
+    )
+    return (
+      <Box flexDirection="column">
+        {column('Call this week', board.call, 'green')}
+        {column('Hold', board.hold)}
+        {column('Drop', board.drop, 'gray')}
+        {board.unscored.length > 0 && column('Not scored', board.unscored, 'yellow')}
+      </Box>
+    )
+  }
+
+  if (id === 'cold-email') {
+    const mail = coldEmailView({
+      letter: await draftFile($, 'gtm/letter.json'),
+      config,
+      ...(runs.spam ? { spam: runs.spam.stdout } : {}),
+      ...(runs.subject ? { subject: runs.subject.stdout } : {}),
+      ...(runs.replies ? { replies: runs.replies.stdout } : {}),
+      ...(runs.deliverability ? { deliverability: runs.deliverability } : {}),
+      now,
+    })
+    const replyKinds = Object.entries(mail.replies)
+    return (
+      <Box flexDirection="column">
+        {mail.words === 0 ? line('No first touch yet. Run /cold-email:cold-email.', { dimColor: true }) : line(`First touch: ${mail.words} words${mail.subject ? ` · subject "${mail.subject}"` : ''}`, { bold: true })}
+        {mail.signal !== '' && line(`Signal: ${mail.signal}`)}
+        {mail.spamScore !== undefined && line(`Spam lint: ${mail.spamScore}/100 ${mail.spamVerdict}`, mail.spamScore >= 75 ? {} : { color: 'yellow' })}
+        {mail.subjectScore !== undefined && line(`Subject line: ${mail.subjectScore}/100`, mail.subjectScore >= 70 ? {} : { color: 'yellow' })}
+        <Text> </Text>
+        {line(`Rhythm: ${mail.rhythm.map(day => (day.isSendDay ? (day.isToday ? `[${day.day}]` : day.day) : day.isToday ? `(${day.day.toLowerCase()})` : '·')).join(' ')}`)}
+        {replyKinds.length > 0 && line(`Replies: ${replyKinds.map(([kind, count]) => `${kind} ${count}`).join(' · ')}`)}
+        <Text> </Text>
+        {line(`Deliverability${mail.domain ? ` for ${mail.domain}` : ''}`, { bold: true })}
+        {mail.domain === '' && line('No sending domain in brand-config.infrastructure. /cold-email:cold-email setup asks for it.', { dimColor: true })}
+        {mail.deliverability?.lines.slice(0, 15).map(one => line(one, one.startsWith('✗') ? { color: 'yellow' } : {}))}
+        {mail.domain !== '' && (
+          <Button key="deliverability" label="Check deliverability (DNS, needs dig)" onPress={() => loadView($, settings, 'cold-email', true)} />
+        )}
+      </Box>
+    )
+  }
+
+  if (id === 'evp') {
+    const ladder = evpLadder(config)
+    if (ladder.primary === '' && ladder.rungs.every(rung => rung.lines.length === 0)) return empty('No value line yet. Run /evp:evp.')
+    return (
+      <Box flexDirection="column">
+        {line('Awareness ladder (Schwartz): one line per reader', { bold: true })}
+        {ladder.rungs.map(rung => (
+          <Box flexDirection="column">
+            {line(`${rung.isChosen ? '▸' : ' '} ${rung.tier}. ${rung.name}${rung.isChosen ? '  (outreach line)' : ''}`, rung.isChosen ? { bold: true, color: 'cyan' } : { dimColor: rung.lines.length === 0 })}
+            {rung.lines.slice(0, 2).map(text => line(`    ${text}`))}
+          </Box>
+        ))}
+      </Box>
+    )
+  }
+
+  if (id === 'geo') {
+    const geo = geoView(await draftFile($, 'gtm/findability.json'), now)
+    if (geo === undefined) return empty('No findability record yet. Run /geo:geo.')
+    return (
+      <Box flexDirection="column">
+        {geo.question !== '' && line(`Buyer question: ${geo.question}`, { bold: true })}
+        {geo.killDate !== '' && line(`Kill date ${geo.killDate}${geo.daysLeft !== undefined ? ` · ${geo.daysLeft >= 0 ? `${geo.daysLeft} days left` : `${-geo.daysLeft} days past: review now (/geo:geo review)`}` : ''}`, geo.daysLeft !== undefined && geo.daysLeft < 0 ? { color: 'yellow' } : {})}
+        {geo.isIndexable !== undefined && line(`Indexable: ${geo.isIndexable ? 'yes' : 'no'}`, geo.isIndexable ? {} : { color: 'yellow' })}
+        {geo.blockedBots.length > 0 && line(`Blocked crawlers: ${geo.blockedBots.join(', ')}`, { color: 'yellow' })}
+        {geo.engines.length > 0 && <Text> </Text>}
+        {geo.engines.length > 0 && line('Citations by engine', { bold: true })}
+        {geo.engines.map(one => line(`${one.engine.padEnd(22)} brand ${one.status || 'unknown'} · ${one.cited} cited URL${one.cited === 1 ? '' : 's'}`))}
+      </Box>
+    )
+  }
+
+  const entries = await $.fs.list(`${root}/drafts`).catch(() => [])
+  const founder = founderView(entries.filter(one => one.kind === 'file'), now)
+  return (
+    <Box flexDirection="column">
+      {line(founder.daysSinceLast === undefined ? 'No posts in drafts/ yet. Run /founder-brand:founder-brand.' : `Last post ${founder.daysSinceLast} day${founder.daysSinceLast === 1 ? '' : 's'} ago · ${founder.postsLast28} in the last 28 days`, founder.isLate ? { color: 'yellow', bold: true } : { bold: true })}
+      {founder.isLate && founder.daysSinceLast !== undefined && line('Over 7 days since the last post: the rotation has stalled.', { color: 'yellow' })}
+      <Text> </Text>
+      {founder.pillars.map(one => line(`${one.pillar.padEnd(8)} ${one.count} post${one.count === 1 ? '' : 's'}${one.lastDaysAgo !== undefined ? ` · last ${one.lastDaysAgo}d ago` : ' · none yet'}`, one.count === 0 ? { dimColor: true } : {}))}
+    </Box>
+  )
+}
+
 export const register: Register = (on, options) => {
   const settings = settingsFrom(options)
 
@@ -382,6 +628,11 @@ export const register: Register = (on, options) => {
       name: 'gtm-score',
       description: "Score the GTM drafts with each pack's own scorer",
       argumentHint: '[pack]',
+      immediate: true,
+    })
+    await $.command.register({
+      name: 'gtm-health',
+      description: 'Cross-pack checks: stale drafts, drafts that disagree, buyers the list leaves out',
       immediate: true,
     })
     await $.command.register({
@@ -434,6 +685,14 @@ export const register: Register = (on, options) => {
       return `${one.step}. ${one.name}: ${label}${first}${why}`
     })
     return { text: lines.join('\n') }
+  })
+
+  on('command.run', { command: 'gtm-health' }, async $ => {
+    await refresh($, settings)
+    const found = await read($, findings)
+    if (found.length === 0) return { text: 'No cross-pack issues: no stale drafts, no disagreements, no missing buyers.' }
+    await update($, tab, () => 'health')
+    return { text: found.map(one => `- [${one.kind}] ${one.message}`).join('\n') }
   })
 
   on('command.run', { command: 'gtm-guard' }, async ($, e) => {
@@ -520,7 +779,8 @@ export const register: Register = (on, options) => {
       'This project uses the GTM operator skill packs. brand-config.json and SOUL.md are shared: ' +
       'merge field by field, never rewrite them, and ask before changing a filled value. ' +
       'Drafts live in gtm/, one file per pack.\n' + summary(found) +
-      (failing.length > 0 ? `\nDrafts that fail their pack's scorer:\n${failing.join('\n')}` : '')
+      (failing.length > 0 ? `\nDrafts that fail their pack's scorer:\n${failing.join('\n')}` : '') +
+      (await read($, findings)).reduce((out, one, i) => `${out}${i === 0 ? '\nCross-pack warnings (heuristics; confirm before acting):' : ''}\n- ${one.message}`, '')
 
     return {
       sections: [...composed.sections, { id: 'gtm-operator:state', text, scope: 'session' }],
@@ -538,6 +798,7 @@ export const register: Register = (on, options) => {
     const step = nextStep(found)
     const count = `GTM ${doneCount(found)}/${found.steps.length}`
     const failing = failingCount(await read($, scores))
+    const warnings = (await read($, findings)).length
 
     return (
       <Box flexDirection="column">
@@ -545,6 +806,7 @@ export const register: Register = (on, options) => {
         <Box flexDirection="row" gap={1}>
           <Text bold>{count}</Text>
           {failing > 0 && <Text color="yellow">{`${failing} to fix`}</Text>}
+          {warnings > 0 && <Text color="yellow">{`${warnings} warning${warnings === 1 ? '' : 's'}`}</Text>}
           {step === undefined
             ? <Text dimColor>every step in place</Text>
             : <Text>Next: <Text bold>{step.command}</Text><Text dimColor> — {step.why}</Text></Text>}
@@ -580,12 +842,57 @@ export const register: Register = (on, options) => {
     const all = await read($, scores)
     const past = await read($, history)
     const current = await read($, tab)
+    const health = await read($, findings)
+    const current_view = await read($, view)
     const tabs = (
       <Box flexDirection="row" gap={2}>
         <Button key="tab-board" label="Board" hotkey="1" plain onPress={() => update($, tab, () => 'board' as Tab)} />
         <Button key="tab-detail" label="Detail" hotkey="2" plain onPress={() => update($, tab, () => 'detail' as Tab)} />
+        <Button key="tab-health" label={`Health${health.length > 0 ? ` (${health.length})` : ''}`} hotkey="3" plain onPress={() => update($, tab, () => 'health' as Tab)} />
+        <Button key="tab-views" label="Views" hotkey="4" plain onPress={() => loadView($, settings, current_view)} />
       </Box>
     )
+
+    if (current === 'health') {
+      const kindLabel = { stale: 'Stale', consistency: 'Mismatch', coverage: 'Gap' } as const
+      return (
+        <Box flexDirection="column">
+          {tabs}
+          <Text> </Text>
+          <Text bold>Cross-pack checks</Text>
+          <Text dimColor>{cut('Heuristics across packs. Warnings only; nothing is blocked.', width)}</Text>
+          <Text> </Text>
+          {health.length === 0 && <Text>No stale drafts, no disagreements, no missing buyers.</Text>}
+          {health.map(one => (
+            <Box flexDirection="column">
+              <Text color="yellow">{cut(`${kindLabel[one.kind]}: ${one.message}`, width * 2)}</Text>
+              {one.fix && (
+                <Button key={`finding-${one.id}`} label="Fix with Claude" onPress={() => $.prompt.fill({ text: one.fix ?? '' })} />
+              )}
+            </Box>
+          ))}
+        </Box>
+      )
+    }
+
+    if (current === 'views') {
+      const viewTabs = (
+        <Box flexDirection="row" gap={1}>
+          {([['pricing', 'Pricing'], ['prospects', 'Prospects'], ['cold-email', 'Cold email'], ['evp', 'EVP'], ['geo', 'GEO'], ['founder', 'Founder']] as const)
+            .map(([id, label]) => (
+              <Button key={`view-${id}`} label={id === current_view ? `[${label}]` : label} plain onPress={() => loadView($, settings, id)} />
+            ))}
+        </Box>
+      )
+      return (
+        <Box flexDirection="column">
+          {tabs}
+          {viewTabs}
+          <Text> </Text>
+          {await drawView($, e, settings, current_view, width)}
+        </Box>
+      )
+    }
 
     if (current === 'detail') {
       const id = await read($, selected)

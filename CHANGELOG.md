@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.4.0] — 2026-10-05
+
+What no single pack can see.
+
+### Added
+- Health tab and `/gtm-health`: drafts gone stale after a PSP, EVP or price change; a landing page that doesn't lead with the EVP or name the tiers; a letter or sequence with none of the buyer's words; roles the prospect list leaves out. Each with Fix with Claude. Claude reads them too.
+- Views tab: Pricing (pocket-price waterfall, tier contrast check), Prospects (call / hold / drop), Cold email (lint and subject scores, send rhythm, reply triage, deliverability on request), EVP ladder, GEO (kill date, citations, blocked crawlers), Founder (pillar rotation, 7-day warning).
+- Warning counts on the band and the status line.
+
 ## [0.3.0] — 2026-10-05
 
 From step tracker to scoreboard: the mod now scores every draft with its pack's own scorer.

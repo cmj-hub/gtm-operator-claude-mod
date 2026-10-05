@@ -45,6 +45,18 @@ export type Fake = {
   fills: string[]
   runs: string[][]
   write: (rel: string, text: string) => void
+  /** Moves the clock the mod reads. */
+  setNow: (ms: number) => void
+}
+
+/** Extra tools that ship next to a pack's scorer, and the fixture each answers with. */
+const TOOLS: Record<string, { pack: string; script: string; fixture: (input: string) => string }> = {
+  'pocket_price_waterfall.py': { pack: 'pricing', script: 'scripts/pocket_price_waterfall.py', fixture: () => 'waterfall' },
+  'decoy_validator.py': { pack: 'pricing', script: 'scripts/decoy_validator.py', fixture: input => (input.includes('BAD') ? 'decoy-broken' : 'decoy-healthy') },
+  'spam_word_lint.py': { pack: 'cold-email', script: 'scripts/spam_word_lint.py', fixture: () => 'spam-letter' },
+  'score_subject_line.py': { pack: 'cold-email', script: 'scripts/score_subject_line.py', fixture: () => 'subject-t1' },
+  'score_reply.py': { pack: 'cold-email', script: 'scripts/score_reply.py', fixture: () => 'replies' },
+  'check_deliverability.py': { pack: 'cold-email', script: 'scripts/check_deliverability.py', fixture: () => 'deliverability-nodig' },
 }
 
 export type FakeOptions = {
@@ -67,6 +79,7 @@ export function fake(on: On, options: FakeOptions = {}): Fake {
   }
   if (options.isInstalled !== false) {
     for (const pack of PACKS) put(`${CACHE}/${pack.plugin}/0.7.0/${pack.scorer}`, '# scorer')
+    for (const tool of Object.values(TOOLS)) put(`${CACHE}/${tool.pack}/0.7.0/${tool.script}`, '# tool')
   }
 
   const store = new Map<string, unknown>()
@@ -94,7 +107,8 @@ export function fake(on: On, options: FakeOptions = {}): Fake {
   const failedRoots = options.failedRoots ?? 0
   on('session.root', () => (++roots <= failedRoots ? { deny: 'unavailable' } : { value: ROOT }))
   on('env.get', (_$, e) => ({ value: e.name === 'HOME' ? HOME : undefined }))
-  on('clock.now', () => ({ value: NOW }))
+  let now = NOW
+  on('clock.now', () => ({ value: now }))
   on('ui.status', () => ({ value: undefined }))
   on('ui.open', () => ({ value: { isPlaced: true } }))
   on('ui.toast', (_$, e) => {
@@ -127,6 +141,13 @@ export function fake(on: On, options: FakeOptions = {}): Fake {
     const argv = [...e.argv]
     runs.push(argv)
     const scorer = argv[1] ?? ''
+    const toolName = scorer.slice(scorer.lastIndexOf('/') + 1)
+    const tool = TOOLS[toolName]
+    if (tool !== undefined && scorer.includes(`/${tool.pack}/`)) {
+      const fileArg = argv.indexOf('--file')
+      const recorded = FIXTURES[tool.fixture(fileArg >= 0 ? files.get(argv[fileArg + 1] ?? '')?.text ?? '' : '')]
+      return recorded === undefined ? result(2, '', 'no fixture') : result(recorded.exitCode, recorded.stdout, recorded.stderr ?? '')
+    }
     const pack = PACKS.find(one => scorer.endsWith(one.scorer))
     if (pack === undefined) return result(2, '', 'unknown scorer')
     const fileArg = argv.indexOf('--file')
@@ -139,5 +160,5 @@ export function fake(on: On, options: FakeOptions = {}): Fake {
     return result(recorded.exitCode, recorded.stdout)
   })
 
-  return { files, store, toasts, fills, runs, write: put }
+  return { files, store, toasts, fills, runs, write: put, setNow: ms => { now = ms } }
 }
