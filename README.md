@@ -34,8 +34,9 @@ Part of the GTM operator suite — `/plugin install gtm@gtm-operator-skills` ins
 | `/gtm-board`, Detail tab | The step's score breakdown, each fix, any SOUL.md phrases it uses, the draft text, and **Fix with Claude** (puts the pack command and the fixes in your prompt). |
 | `/gtm-board`, Health tab | Cross-pack warnings: drafts written before the PSP, EVP or price changed; a landing page that doesn't lead with the EVP or name the price tiers; a letter or sequence with none of the buyer's words; roles from `icp.role_targets` the prospect list leaves out. Each has **Fix with Claude**. |
 | `/gtm-board`, Views tab | Six pack views: **Pricing** (pocket-price waterfall and tier contrast check), **Prospects** (call / hold / drop), **Cold email** (lint and subject scores, send rhythm, reply triage, deliverability), **EVP** (awareness ladder), **GEO** (kill-date countdown, citations by engine, blocked crawlers), **Founder** (posts per pillar, 7-day warning). |
-| `/gtm-board`, Analytics tab | Score trend per pack, how many drafts it took to pass and how long, fixes resolved; an outcome log (replies and meetings each week, tied to the cold email that was live); **Copy weekly digest**. |
+| `/gtm-board`, Analytics tab | Score trend per pack, how many drafts it took to pass and how long, fixes resolved; an outcome log (replies and meetings each week, tied to the cold email that was live; or import them from a CSV); **Copy weekly digest**. |
 | `/gtm-score [pack]`, `/gtm-health`, `/gtm-digest` | The scores, the cross-pack warnings and the weekly digest as text, for the VS Code extension, `claude -p` and cloud sessions. |
+| `/gtm-outcomes [import <file.csv>]` | Replies and meetings per cold email version. `import` reads a CSV from your project (a `date` column plus `replies` and/or `meetings`, as a CRM export or a spreadsheet gives it); importing the same dates again replaces them. |
 | `/gtm-sprint [to <step>]` | Runs the packs in order. Each pack runs only after the one before passes its scorer; a failing draft pauses the sprint until you fix it and `/gtm-sprint resume`. `/gtm-sprint stop` ends it. The **Sprint** button on the board starts one too. |
 | Tools Claude can call | `gtm_status`, `gtm_score` (one pack, now) and `gtm_consistency`, so Claude checks its own draft before saying it's done. |
 | `gtm-operator:reviewer` | A read-only subagent that reviews one draft against the PSP, the EVP, SOUL.md and its scorer, and returns at most five changes. |
@@ -152,8 +153,8 @@ Mods run in Claude Code only. In the VS Code extension the guard and `/gtm-board
 
 What `claude plugin validate .` reports, so you can review it before installing:
 
-- **Hooks:** `session.start`, `classic.SessionStart` (after `/clear`, `/resume`, `/branch`), `command.run` (its six commands), `tool.call` (Write and Edit to guard and gate, every call to refresh and score, and its own three tools), `turn.complete` (moves a sprint on), `prompt.compose`, `ui.render` (the band and its own pane).
-- **Calls:** `$.fs.read`, `$.fs.list`, `$.fs.exists`, `$.fs.stat` (your project's `brand-config.json`, `SOUL.md`, `gtm/`, `drafts/`, and the folders where packs install); `$.process.run` (only `python3 <pack script> ... --json`: the installed packs' own scorers and the view tools listed above, 20-second timeout; off with `runScorers`. The deliverability check makes DNS lookups through `dig`, and only when you press its button); `$.env.get` (`HOME` only, to find the plugin cache); `$.store.get` / `$.store.set` (`isBandHidden`, and per project the score history, the outcome log, and the hashes of the PSP, EVP and pricing blocks); `$.tool.register` (its three tools) and `$.agent.register` (the reviewer); `$.command.run` (only the pack commands you start with **Run**, **Sprint** or a sprint step); `$.prompt.fill`; `$.ui.copy` (the digest, when you press its button); and display calls.
+- **Hooks:** `session.start`, `classic.SessionStart` (after `/clear`, `/resume`, `/branch`), `command.run` (its seven commands), `tool.call` (Write and Edit to guard and gate, every call to refresh and score, and its own three tools), `turn.complete` (moves a sprint on), `prompt.compose`, `ui.render` (the band and its own pane).
+- **Calls:** `$.fs.read`, `$.fs.list`, `$.fs.exists`, `$.fs.stat` (your project's `brand-config.json`, `SOUL.md`, `gtm/`, `drafts/`, a CSV you name to `/gtm-outcomes import`, and the folders where packs install); `$.process.run` (only `python3 <pack script> ... --json`: the installed packs' own scorers and the view tools listed above, 20-second timeout; off with `runScorers`. The deliverability check makes DNS lookups through `dig`, and only when you press its button); `$.env.get` (`HOME` only, to find the plugin cache); `$.store.get` / `$.store.set` (`isBandHidden`, and per project the score history, the outcome log, and the hashes of the PSP, EVP and pricing blocks); `$.tool.register` (its three tools) and `$.agent.register` (the reviewer); `$.command.run` (only the pack commands you start with **Run**, **Sprint** or a sprint step); `$.prompt.fill`; `$.ui.copy` (the digest, when you press its button); and display calls.
 - **Never:** `$.fs.write`, `$.http.fetch`, `$.env.set`, `$.model`, `$.prompt.submit`.
 
 ## On the site
@@ -182,7 +183,22 @@ claude plugin test .
 tsc -p .        # after Claude Code has loaded the mod once (it writes .claude-plugin/types/)
 ```
 
-`hooks/register.tsx` holds the hooks; `hooks/gtm.ts` the step walk and merge checks; `hooks/packs.ts` the ten packs' scorers and drafts; `hooks/score.ts` turns each scorer's JSON into one shape; `hooks/locate.ts` says where packs install; `hooks/voice.ts` and `hooks/history.ts` the voice check and score history; `hooks/drift.ts` the cross-pack checks; `hooks/views.ts` the pack views' data; `hooks/analytics.ts` the stats, digest, outcomes and sprint steps; `types/index.d.ts` the `$.state` contract. Tests are in `tests/`, with the scorers' real output recorded in `tests/fixtures.ts`. `docs/ROADMAP.md` is the plan through v0.5. The images in `assets/` are rendered from `spec.json` (with `card.mjs`), `lockup.html`, `demo.html` and `logo.svg`.
+The eval suite in `evals/` runs Claude with and without the mod on a sample project built from the packs' own examples. It calls the model, so it runs on demand (the **evals** workflow, with an `ANTHROPIC_API_KEY` secret) or locally, with the ten pack repos cloned next to this one:
+
+```bash
+claude plugin eval . --scaffold --trust-plugin \
+  --allow-tools Write Edit mcp__gtm-operator__gtm_status mcp__gtm-operator__gtm_score
+```
+
+| Case | Checks | With the mod | Without |
+|---|---|---|---|
+| `guard-keeps-config` | Asked to overwrite `brand-config.json` with a stub, the ICP and PSP survive | 1.00 | 0.00 |
+| `which-drafts-fail` | Names the drafts that fail their pack's scorer, with the score | 1.00 | 0.75 |
+| `score-before-done` | Scores a new founder post with `gtm_score` after writing it, before calling it ready | 1.00 (scored it every run) | not applicable |
+
+Measured 2026-10-05, two runs per arm.
+
+`hooks/register.tsx` holds the hooks; `hooks/gtm.ts` the step walk and merge checks; `hooks/packs.ts` the ten packs' scorers and drafts; `hooks/score.ts` turns each scorer's JSON into one shape; `hooks/locate.ts` says where packs install; `hooks/voice.ts` and `hooks/history.ts` the voice check and score history; `hooks/drift.ts` the cross-pack checks; `hooks/views.ts` the pack views' data; `hooks/analytics.ts` the stats, digest, outcomes and sprint steps; `types/index.d.ts` the `$.state` contract. Tests are in `tests/`, with the scorers' real output recorded in `tests/fixtures.ts`. `docs/ROADMAP.md` is the plan through v0.6. `evals/` holds the `claude plugin eval` suite (see below). The images in `assets/` are rendered from `spec.json` (with `card.mjs`), `lockup.html`, `demo.html` and `logo.svg`.
 
 ## Privacy and security
 

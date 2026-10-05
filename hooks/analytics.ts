@@ -73,6 +73,62 @@ export function outcomesByVersion(log: readonly Outcome[]): { version: string; s
   return [...rows.values()]
 }
 
+export type OutcomeRow = { at: number; kind: Outcome['kind']; count: number }
+
+/** Splits one CSV line, honouring double quotes. */
+function csvCells(line: string): string[] {
+  const cells: string[] = []
+  let cell = ''
+  let quoted = false
+  for (let i = 0; i < line.length; i += 1) {
+    const ch = line[i]
+    if (quoted && ch === '"' && line[i + 1] === '"') { cell += '"'; i += 1 }
+    else if (ch === '"') quoted = !quoted
+    else if (ch === ',' && !quoted) { cells.push(cell.trim()); cell = '' }
+    else cell += ch
+  }
+  cells.push(cell.trim())
+  return cells
+}
+
+/**
+ * Reads an outcome CSV: a date column (`date`, `week` or `day`) and a
+ * `replies` and/or `meetings` column of whole numbers. Blank cells are skipped;
+ * a bad row is named in `errors` and left out.
+ */
+export function parseOutcomeCsv(text: string): { rows: OutcomeRow[]; errors: string[] } {
+  const lines = text.split(/\r?\n/)
+  const header = csvCells(lines[0] ?? '').map(one => one.toLowerCase())
+  const dateAt = header.findIndex(one => one === 'date' || one === 'week' || one === 'day')
+  const kinds = (['replies', 'meetings'] as const).map(kind => ({ kind, at: header.indexOf(kind) })).filter(one => one.at >= 0)
+  if (dateAt < 0 || kinds.length === 0) return { rows: [], errors: ['no date column, or no replies or meetings column'] }
+  const rows: OutcomeRow[] = []
+  const errors: string[] = []
+  lines.slice(1).forEach((line, i) => {
+    if (line.trim() === '') return
+    const cells = csvCells(line)
+    const raw = cells[dateAt] ?? ''
+    const at = Date.parse(raw)
+    if (Number.isNaN(at)) { errors.push(`line ${i + 2}: "${raw}" is not a date`); return }
+    const found: OutcomeRow[] = []
+    for (const { kind, at: column } of kinds) {
+      const cell = cells[column] ?? ''
+      if (cell === '') continue
+      if (!/^\d+$/.test(cell)) { errors.push(`line ${i + 2}: ${kind} "${cell}" is not a whole number`); continue }
+      found.push({ at, kind, count: Number(cell) })
+    }
+    rows.push(...found)
+  })
+  return { rows, errors }
+}
+
+/** Adds imported rows to the log; an imported row for the same day and kind replaces the old one. */
+export function importOutcomes(log: readonly Outcome[], rows: readonly OutcomeRow[]): Outcome[] {
+  const same = (a: { at: number; kind: string }, b: { at: number; kind: string }) => a.at === b.at && a.kind === b.kind
+  const kept = log.filter(entry => entry.version !== 'imported' || !rows.some(row => same(row, entry)))
+  return [...kept, ...rows.map(row => ({ ...row, version: 'imported' }))].slice(-200)
+}
+
 const WEEK = 7 * 86_400_000
 
 const date = (ms: number) => new Date(ms).toISOString().slice(0, 10)

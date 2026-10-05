@@ -2,7 +2,7 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, PluginOptions, Register } from 'claude-code'
 
 import type { Finding, GtmBoard, History, Outcome, PackId, Score, Scores, Tab, ToolRuns, ViewId } from '../types'
-import { addOutcome, allStats, digest, duration, outcomesByVersion, outcomesKey, sprintStep } from './analytics'
+import { addOutcome, allStats, digest, duration, importOutcomes, outcomesByVersion, outcomesKey, parseOutcomeCsv, sprintStep } from './analytics'
 import { allFindings, hashOf } from './drift'
 import type { DraftFile, Snapshot, Upstream } from './drift'
 import {
@@ -548,6 +548,8 @@ async function afterSprintTurn($: $, settings: Settings, how: Launch = 'run'): P
   }
 }
 
+const countOf = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
+
 async function logOutcome($: $, kind: Outcome['kind'], value: string): Promise<void> {
   const root = await projectRoot($)
   const letter = await readText($, `${root}/gtm/letter.json`).catch(() => undefined)
@@ -774,6 +776,12 @@ export const register: Register = (on, options) => {
       description: 'The GTM weekly digest: what moved, what needs work, outcomes',
       immediate: true,
     })
+    await $.command.register({
+      name: 'gtm-outcomes',
+      description: 'GTM outcome log: replies and meetings per cold email version; import <file.csv> reads date, replies, meetings',
+      argumentHint: '[import <file.csv>]',
+      immediate: true,
+    })
     await $.tool.register({
       name: 'gtm_status',
       description: 'GTM operator suite status for this project: which steps are done, the next pack command, and each draft\'s score from its pack\'s own scorer. Call before choosing which GTM pack to run.',
@@ -881,6 +889,30 @@ export const register: Register = (on, options) => {
   on('command.run', { command: 'gtm-digest' }, async ($, e) => {
     await refresh($, settings)
     return { text: await weeklyDigest($) }
+  })
+
+  on('command.run', { command: 'gtm-outcomes' }, async ($, e) => {
+    const root = await projectRoot($)
+    const [verb = '', ...rest] = e.args.trim().split(/\s+/)
+    if (verb === 'import') {
+      const rel = rest.join(' ').replace(/^\.\//, '')
+      if (rel === '' || rel.startsWith('/') || rel.split(/[\\/]/).includes('..')) {
+        return { text: 'Give a path inside the project, like crm/outcomes.csv.' }
+      }
+      const text = await readText($, `${root}/${rel}`).catch(() => undefined)
+      if (text === undefined) return { text: `No file at ${rel} (paths are from the project root).` }
+      const parsed = parseOutcomeCsv(text)
+      const next = importOutcomes(await read($, outcomes), parsed.rows)
+      await update($, outcomes, () => next)
+      await $.store.set(outcomesKey(root), next)
+      const skipped = parsed.errors.length > 0 ? ` Skipped: ${parsed.errors.join('; ')}.` : ''
+      return { text: `Imported ${parsed.rows.length} outcome row${parsed.rows.length === 1 ? '' : 's'} from ${rel}.${skipped}` }
+    }
+    const rows = outcomesByVersion(await read($, outcomes))
+    if (rows.length === 0) return { text: 'No outcomes logged. Log them on the board\'s Analytics tab, or /gtm-outcomes import <file.csv> (columns: date, replies, meetings).' }
+    return {
+      text: rows.map(row => `${row.version}: ${countOf(row.replies, 'reply', 'replies')} · ${countOf(row.meetings, 'meeting', 'meetings')}${row.score !== undefined ? ` · letter scored ${row.score}` : ''}`).join('\n'),
+    }
   })
 
   on('command.run', { command: 'gtm-guard' }, async ($, e) => {
@@ -1118,9 +1150,9 @@ export const register: Register = (on, options) => {
           })}
           <Text> </Text>
           <Text bold>Outcomes (log weekly; tied to the live cold email)</Text>
-          {versions.length === 0 && <Text dimColor>{cut('Nothing logged. The packs never read your CRM, so log replies and meetings here.', width)}</Text>}
+          {versions.length === 0 && <Text dimColor>{cut('Nothing logged. The packs never read your CRM: log replies and meetings here, or /gtm-outcomes import <file.csv>.', width)}</Text>}
           {versions.map(row => (
-            <Text>{cut(`letter ${row.version}${row.score !== undefined ? ` (scored ${row.score})` : ''}: ${row.replies} replies · ${row.meetings} meetings`, width)}</Text>
+            <Text>{cut(`letter ${row.version}${row.score !== undefined ? ` (scored ${row.score})` : ''}: ${countOf(row.replies, 'reply', 'replies')} · ${countOf(row.meetings, 'meeting', 'meetings')}`, width)}</Text>
           ))}
           {Input !== undefined && (
             <Input key="outcome-replies" label="Replies this week" placeholder="a number" value="" submitLabel="log" onSubmit={(value: string) => logOutcome($, 'replies', value)} />
