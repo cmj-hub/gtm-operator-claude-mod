@@ -105,4 +105,12 @@ declare module 'claude-code' {
       isGuardOff: boolean
     }
   }
+
+  // The tools this mod registers with $.tool.register, so its own tool.call
+  // matchers type-check whatever MCP servers the machine has connected.
+  interface McpToolInputs {
+    'mcp__gtm-operator__gtm_status': Record<string, never>
+    'mcp__gtm-operator__gtm_score': { pack: string }
+    'mcp__gtm-operator__gtm_consistency': Record<string, never>
+  }
 }

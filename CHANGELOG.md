@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.5.1] — 2026-10-05
+
+Found by running v0.5.0 on a sample project with the ten packs installed from the marketplace.
+
+### Fixed
+- `/gtm-sprint` and `/gtm-sprint resume` in a `-p` run or the SDK no longer say the command is in your prompt (there is none); they name the command to run.
+- The type contract declares the mod's own three tools, so its `tool.call` matchers type-check whatever MCP servers the machine has connected.
+
+### Changed
+- New demo, lockup and social images showing scores, the score gate and cross-pack warnings; README says when the mod uses the network (only the deliverability button).
+
 ## [0.5.0] — 2026-10-05
 
 Actions and analytics.

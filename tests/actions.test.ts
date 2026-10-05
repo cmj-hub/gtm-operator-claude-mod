@@ -116,6 +116,14 @@ test('the sprint runs each pack only after the one before passes', async ($, on)
   expect(project.toasts.at(-1)).toBe('GTM sprint done through step 3.')
 })
 
+test('in a -p run with no prompt to fill, /gtm-sprint names the command to run instead', async ($, on) => {
+  const project = fake(on)
+  await $.session.start({ surface: null, isInteractive: false, cwd: ROOT } as never)
+  const started = await $.command.run({ command: 'gtm-sprint', ...RUN })
+  expect(started.text).toMatch(/^Sprint started: run \/evp:evp to start, then each pack/)
+  expect(project.fills).toEqual([])
+})
+
 test('after a passing turn the sprint runs the next pack itself; a subagent turn never moves it', async ($, on) => {
   const project = fake(on)
   await $.command.run({ command: 'gtm-sprint', ...RUN })
