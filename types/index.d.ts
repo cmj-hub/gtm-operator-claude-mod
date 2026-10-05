@@ -110,7 +110,7 @@ declare module 'claude-code' {
   // matchers type-check whatever MCP servers the machine has connected.
   interface McpToolInputs {
     'mcp__gtm-operator__gtm_status': Record<string, never>
-    'mcp__gtm-operator__gtm_score': { pack: string }
+    'mcp__gtm-operator__gtm_score': { pack?: string; file?: string }
     'mcp__gtm-operator__gtm_consistency': Record<string, never>
   }
 }

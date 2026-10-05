@@ -1,6 +1,6 @@
 {
   "name": "gtm-operator",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "The GTM operator mod for Claude Code: scores every go-to-market draft with its own skill pack's scorer, flags stale and inconsistent drafts across packs, pack dashboards, a guided sprint, analytics, and a guard that keeps brand-config.json and SOUL.md merged.",
   "author": {
     "name": "Jay Mount Consulting",

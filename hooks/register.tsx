@@ -22,7 +22,7 @@ import { addSample, historyKey, sparkline, trend } from './history'
 import { newestFirst, scorerCandidates } from './locate'
 import { PACKS, packById, packForPath } from './packs'
 import type { PackDef, ScorerInput } from './packs'
-import { fixPrompt, normalize, scoreLabel } from './score'
+import { fixPrompt, gateLines, normalize, scoreLabel } from './score'
 import { draftExcerpt, draftText, refusedPhrases, voiceHits } from './voice'
 import { coldEmailView, evpLadder, founderView, geoView, leakLabel, money, pricingView, prospectBoard, shareBar } from './views'
 
@@ -472,7 +472,7 @@ async function gate($: $, settings: Settings, path: string, content: string): Pr
   if (score.status === 'unknown') return undefined
   const value = score.score ?? (score.status === 'pass' ? 100 : 0)
   if (value >= settings.minScore) return undefined
-  const fixes = (score.fixes.length > 0 ? score.fixes : score.reasons).slice(0, 5).map(one => `- ${one}`).join('\n')
+  const fixes = gateLines(score).map(one => `- ${one}`).join('\n')
   return `gtm-operator: this ${pack.name} draft scores ${score.score ?? score.status} with ${pack.repo}'s scorer, ` +
     `below the minimum of ${settings.minScore} set for this project. Fix these, then write it again:\n${fixes}`
 }
@@ -546,6 +546,17 @@ async function afterSprintTurn($: $, settings: Settings, how: Launch = 'run'): P
     await update($, sprint, () => ({ ...active, paused: verdict.reason }))
     $.ui.toast(`GTM sprint paused: ${verdict.reason}. Fix it, then /gtm-sprint resume.`)
   }
+}
+
+/** What gtm_score answers: the label, then the scorer's reasons and fixes. */
+function scoreReport(head: string, score: Score | undefined): string {
+  return [
+    `${head}: ${score ? scoreLabel(score) || score.status : 'not scored'}`,
+    ...(score?.detail ? [score.detail] : []),
+    ...(score?.reasons ?? []).map(one => `reason: ${one}`),
+    ...(score?.fixes ?? []).map(one => `fix: ${one}`),
+    ...(score?.voice ?? []).map(one => `refused phrase from SOUL.md: ${one}`),
+  ].join('\n')
 }
 
 const countOf = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
@@ -788,11 +799,13 @@ export const register: Register = (on, options) => {
     })
     await $.tool.register({
       name: 'gtm_score',
-      description: 'Score one GTM draft now with its pack\'s own scorer and return the score, reasons and fixes. Call after writing or editing a draft in gtm/, drafts/ or the psp/evp blocks of brand-config.json, before saying it is done.',
+      description: 'Score one GTM draft now with its pack\'s own scorer and return the score, reasons and fixes. Give pack, or file to score a given draft. Call after writing or editing a draft in gtm/, drafts/ or the psp/evp blocks of brand-config.json, before saying it is done.',
       inputSchema: {
         type: 'object',
-        properties: { pack: { type: 'string', description: `One of: ${PACKS.map(pack => pack.plugin).join(', ')}` } },
-        required: ['pack'],
+        properties: {
+          pack: { type: 'string', description: `One of: ${PACKS.map(pack => pack.plugin).join(', ')}` },
+          file: { type: 'string', description: 'A draft path from the project root (gtm/letter.json, drafts/2026-10-05-post.md). Scores that file; the pack follows from the path.' },
+        },
       },
     })
     await $.tool.register({
@@ -988,6 +1001,25 @@ export const register: Register = (on, options) => {
   })
 
   on('tool.call', { tool: 'mcp__gtm-operator__gtm_score' }, async ($, e) => {
+    const file = 'file' in e && typeof e.file === 'string' ? e.file.trim() : ''
+    if (file !== '') {
+      const root = await projectRoot($)
+      const rel = relative(file, root)
+      const filePack = rel === undefined ? undefined : packForPath(rel)
+      if (rel === undefined || filePack === undefined) {
+        const text = `${file} is not a GTM draft: give a gtm/*.json or drafts/*.md path, or a pack (${PACKS.map(one => one.plugin).join(', ')}).`
+        return { result: text, text, isError: true }
+      }
+      const content = await readText($, `${root}/${rel}`).catch(() => undefined)
+      if (content === undefined) {
+        const text = `No file at ${rel}.`
+        return { result: text, text, isError: true }
+      }
+      if (scorerPaths.size === 0) await locateScorers($, settings)
+      const score = await runScorer($, settings, filePack, { stdin: content })
+      const text = scoreReport(`${filePack.name} (${filePack.command}), ${rel}`, score)
+      return { result: text, text }
+    }
     const wanted = 'pack' in e && typeof e.pack === 'string' ? e.pack : ''
     const pack = PACKS.find(one => one.plugin === wanted || one.id === wanted || one.repo === wanted)
     if (pack === undefined) {
@@ -996,14 +1028,7 @@ export const register: Register = (on, options) => {
     }
     await scoreAll($, settings, [pack], true)
     const score = (await read($, scores))[pack.id]
-    const lines = [
-      `${pack.name} (${pack.command}): ${score ? scoreLabel(score) || score.status : 'not scored'}`,
-      ...(score?.detail ? [score.detail] : []),
-      ...(score?.reasons ?? []).map(one => `reason: ${one}`),
-      ...(score?.fixes ?? []).map(one => `fix: ${one}`),
-      ...(score?.voice ?? []).map(one => `refused phrase from SOUL.md: ${one}`),
-    ]
-    const text = lines.join('\n')
+    const text = scoreReport(`${pack.name} (${pack.command})`, score)
     return { result: text, text }
   })
 
@@ -1152,7 +1177,7 @@ export const register: Register = (on, options) => {
           <Text bold>Outcomes (log weekly; tied to the live cold email)</Text>
           {versions.length === 0 && <Text dimColor>{cut('Nothing logged. The packs never read your CRM: log replies and meetings here, or /gtm-outcomes import <file.csv>.', width)}</Text>}
           {versions.map(row => (
-            <Text>{cut(`letter ${row.version}${row.score !== undefined ? ` (scored ${row.score})` : ''}: ${countOf(row.replies, 'reply', 'replies')} · ${countOf(row.meetings, 'meeting', 'meetings')}`, width)}</Text>
+            <Text>{cut(`${row.version === 'imported' ? 'imported from CSV' : `letter ${row.version}`}${row.score !== undefined ? ` (scored ${row.score})` : ''}: ${countOf(row.replies, 'reply', 'replies')} · ${countOf(row.meetings, 'meeting', 'meetings')}`, width)}</Text>
           ))}
           {Input !== undefined && (
             <Input key="outcome-replies" label="Replies this week" placeholder="a number" value="" submitLabel="log" onSubmit={(value: string) => logOutcome($, 'replies', value)} />

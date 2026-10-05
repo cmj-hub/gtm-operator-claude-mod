@@ -104,6 +104,21 @@ export function scoreLabel(score: Score | undefined): string {
   return fixCount > 0 ? `${head} · ${fixCount} fix${fixCount === 1 ? '' : 'es'}` : head
 }
 
+/**
+ * What a gate refusal tells Claude to change: the scorer's fixes, else its
+ * reasons, else the axes furthest below their maximum. Never an empty list.
+ */
+export function gateLines(score: Score, limit = 5): string[] {
+  if (score.fixes.length > 0) return score.fixes.slice(0, limit)
+  if (score.reasons.length > 0) return score.reasons.slice(0, limit)
+  const short = [...score.axes]
+    .filter(axis => axis.score < axis.max)
+    .sort((a, b) => a.score / a.max - b.score / b.max)
+    .slice(0, limit)
+    .map(axis => `raise ${axis.name} (${axis.score}/${axis.max})${axis.notes[0] ? `: ${axis.notes[0]}` : ''}`)
+  return short.length > 0 ? short : ["run the pack's command to see what its scorer wants"]
+}
+
 /** The prompt "Fix with Claude" fills in. */
 export function fixPrompt(command: string, score: Score): string {
   const items = score.fixes.length > 0 ? score.fixes : score.reasons
