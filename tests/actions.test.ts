@@ -98,6 +98,11 @@ test('Claude can score a draft and read status and warnings through its tools', 
   const status = await $.tool.call({ tool: 'mcp__gtm-operator__gtm_status' } as never)
   expect(String(status.text)).toContain('4. First touch (/cold-email:cold-email): fail · 3 fixes')
 
+  const byFile = await $.tool.call({ tool: 'mcp__gtm-operator__gtm_score', file: 'gtm/letter.json' } as never)
+  expect(String(byFile.text)).toMatch(/^First touch \(\/cold-email:cold-email\), gtm\/letter\.json: fail · 3 fixes/)
+  const notDraft = await $.tool.call({ tool: 'mcp__gtm-operator__gtm_score', file: 'README.md' } as never)
+  expect(String(notDraft.text)).toContain('README.md is not a GTM draft')
+
   const unknown = await $.tool.call({ tool: 'mcp__gtm-operator__gtm_score', pack: 'nope' } as never)
   expect(String(unknown.text)).toContain('Unknown pack "nope"')
 
@@ -199,4 +204,9 @@ test('/gtm-outcomes import reads a CSV from the project into the outcome log', a
   expect(outside.text).toBe('Give a path inside the project, like crm/outcomes.csv.')
   const listed = await $.command.run({ command: 'gtm-outcomes', ...RUN })
   expect(listed.text).toContain('imported: 6 replies · 3 meetings')
+  await $.command.run({ command: 'gtm-board', ...RUN })
+  const pane = await $.ui.mount({ plugin: 'gtm-operator', surface: 'terminal', component: 'Pane', requestId: 'gtm-board', props: PANE_PROPS })
+  await pane.press({ key: 'tab-analytics' })
+  expect(await pane.find({ type: 'Text', text: 'imported from CSV: 6 replies · 3 meetings' })).toBeDefined()
+  await pane.unmount()
 })

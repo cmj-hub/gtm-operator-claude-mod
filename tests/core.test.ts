@@ -3,7 +3,7 @@ import { describe, expect, test } from 'claude-code/testing'
 import { addSample, sparkline, trend } from '../hooks/history'
 import { newestFirst, scorerCandidates } from '../hooks/locate'
 import { PACKS, packForPath } from '../hooks/packs'
-import { fixPrompt, normalize, scoreLabel } from '../hooks/score'
+import { fixPrompt, gateLines, normalize, scoreLabel } from '../hooks/score'
 import { draftExcerpt, draftText, refusedPhrases, voiceHits } from '../hooks/voice'
 import type { History } from '../types'
 import { FIXTURES } from './fixtures'
@@ -72,6 +72,21 @@ describe('locate', () => {
     expect(packForPath('gtm/letter.json')?.id).toBe('letter')
     expect(packForPath('drafts/2026-10-05-proof.md')?.id).toBe('posts')
     expect(packForPath('gtm/notes.txt')).toBeUndefined()
+  })
+})
+
+describe('gate', () => {
+  test('a refusal lists fixes, else reasons, else the lowest axes, never nothing', () => {
+    const base = { pack: 'posts' as const, status: 'pass' as const, score: 79, reasons: [], fixes: [], at: 0 }
+    const axes = [
+      { name: 'hook', score: 0, max: 20, notes: [] },
+      { name: 'receipt', score: 25, max: 25, notes: [] },
+      { name: 'anti-patterns', score: 9, max: 15, notes: ['thought-leader voice'] },
+    ]
+    expect(gateLines({ ...base, fixes: ['cut it'], reasons: ['r'], axes })).toEqual(['cut it'])
+    expect(gateLines({ ...base, reasons: ['r'], axes })).toEqual(['r'])
+    expect(gateLines({ ...base, axes })).toEqual(['raise hook (0/20)', 'raise anti-patterns (9/15): thought-leader voice'])
+    expect(gateLines({ ...base, axes: [] })).toEqual(['run the pack\'s command to see what its scorer wants'])
   })
 })
 

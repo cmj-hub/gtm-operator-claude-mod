@@ -21,7 +21,7 @@ Part of the GTM operator suite — `/plugin install gtm@gtm-operator-skills` ins
 > `/gtm:next` tells you the next step when you ask. The mod tells you before you ask, and stops the write that would have cost you your ICP.
 
 <p align="center">
-  <img src="./assets/demo.png" alt="Illustration of the gtm-operator mod in a Claude Code terminal: the score gate refuses a founder post that scores 45 against a minimum of 60 and lists the fixes, Claude's gtm_consistency tool flags price tiers missing from the landing page, the band reads GTM 9/11, 2 to fix, 4 warnings, and the GTM board pane shows each step's score from its own pack." width="100%">
+  <img src="./assets/screens/hero.png" alt="Claude Code in a terminal with the GTM operator mod: Claude answers which drafts need work from the mod's scores and cross-pack checks, the GTM board pane lists all eleven steps with each pack's score, and the band above the prompt reads GTM 10/11, 1 to fix, 4 warnings, next /sales-offer:cold-offer." width="100%">
 </p>
 
 ## What it does
@@ -44,6 +44,41 @@ Part of the GTM operator suite — `/plugin install gtm@gtm-operator-skills` ins
 | Claude's system prompt | Each turn Claude reads what is done, what is next, the merge rules, and which drafts fail their scorer with the first fix. |
 
 It re-checks every 30 seconds and after any write or shell command, and re-scores a draft only when it changes. Score history is kept per project across sessions. **Hide** is remembered across sessions; **Show band** in the pane brings it back.
+
+## Screens
+
+All of these are captured from Claude Code 2.1.289 in a terminal, running this mod on a sample project built from the ten packs' own example files. Nothing is mocked up.
+
+**The score gate.** With `minScore` at 80, Claude's edit to a founder post is refused with the axes to raise. Claude fixes the opener and the edit goes through.
+
+<img src="./assets/screens/gate.png" alt="An Edit to a founder post refused by gtm-operator: the draft scores 79 with claude-founder-brand's scorer, below the minimum of 80, with fixes to raise the hook axis and the anti-patterns axis. Claude then removes the 'Stop. Read this.' opener." width="100%">
+
+**The band above the prompt and the status line.**
+
+<img src="./assets/screens/band.png" alt="The band reads GTM 10/11, 1 to fix, 4 warnings, Next: /sales-offer:cold-offer, no give-first offer yet, with Use, Run, Board and Hide buttons; the status line repeats it." width="100%">
+
+<table>
+<tr>
+<td width="50%"><b>Board.</b> Every step with its own pack's score and trend.<br><img src="./assets/screens/board.png" alt="The Board tab: ten steps with scores such as Profile 100/100, Findability fail with 16 fixes, Founder posts 100/100 with a trend, and Fill next, Run next and Sprint buttons."></td>
+<td width="50%"><b>Detail.</b> A failing draft's fixes, its fields, and Fix with Claude.<br><img src="./assets/screens/detail-geo.png" alt="The Detail tab for Findability (GEO): fail with 16 fixes listed, the draft's fields, and Fix with Claude and Rescore buttons."></td>
+</tr>
+<tr>
+<td><b>Health.</b> What no single pack can see.<br><img src="./assets/screens/health.png" alt="The Health tab: four cross-pack warnings, such as price tiers missing from the landing page and a first touch with none of the buyer's words, each with Fix with Claude."></td>
+<td><b>Analytics.</b> Trends, drafts to pass, outcomes.<br><img src="./assets/screens/analytics.png" alt="The Analytics tab: score history per pack, the founder post going from 37 to 100 after two failing drafts, nine fixes resolved, and replies and meetings imported from a CSV."></td>
+</tr>
+<tr>
+<td><b>Pricing view.</b> Pocket-price waterfall and tier check.<br><img src="./assets/screens/view-pricing.png" alt="The Pricing view: pocket-price waterfall bars per customer with the biggest leaks, and the tier contrast check at 100 out of 100."></td>
+<td><b>Cold email view.</b> Lint, subject, rhythm, replies.<br><img src="./assets/screens/view-cold-email.png" alt="The Cold email view: first touch word count and subject, spam lint 100 out of 100, subject line 87 out of 100, the Monday, Wednesday, Friday rhythm, reply triage counts and a deliverability button."></td>
+</tr>
+<tr>
+<td><b>EVP view.</b> The awareness ladder.<br><img src="./assets/screens/view-evp.png" alt="The EVP view: five Schwartz awareness tiers with the chosen tier and the outreach line marked."></td>
+<td><b>GEO view.</b> Kill date, citations by engine, blocked crawlers.<br><img src="./assets/screens/view-geo.png" alt="The GEO view: the buyer question, kill date, indexability, blocked crawlers and citations by engine."></td>
+</tr>
+<tr>
+<td><b>Prospects view.</b> Call this week, hold, drop.<br><img src="./assets/screens/view-prospects.png" alt="The Prospects view: one prospect in the call-this-week column with its signal."></td>
+<td><b>Founder view.</b> Posts per pillar, with a 7-day warning.<br><img src="./assets/screens/view-founder.png" alt="The Founder view: the last post date, and posts per pillar: pillar, proof, process and person."></td>
+</tr>
+</table>
 
 ## How scoring works
 
@@ -198,7 +233,7 @@ claude plugin eval . --scaffold --trust-plugin \
 
 Measured 2026-10-05, two runs per arm.
 
-`hooks/register.tsx` holds the hooks; `hooks/gtm.ts` the step walk and merge checks; `hooks/packs.ts` the ten packs' scorers and drafts; `hooks/score.ts` turns each scorer's JSON into one shape; `hooks/locate.ts` says where packs install; `hooks/voice.ts` and `hooks/history.ts` the voice check and score history; `hooks/drift.ts` the cross-pack checks; `hooks/views.ts` the pack views' data; `hooks/analytics.ts` the stats, digest, outcomes and sprint steps; `types/index.d.ts` the `$.state` contract. Tests are in `tests/`, with the scorers' real output recorded in `tests/fixtures.ts`. `docs/ROADMAP.md` is the plan through v0.6. `evals/` holds the `claude plugin eval` suite (see below). The images in `assets/` are rendered from `spec.json` (with `card.mjs`), `lockup.html`, `demo.html` and `logo.svg`.
+`hooks/register.tsx` holds the hooks; `hooks/gtm.ts` the step walk and merge checks; `hooks/packs.ts` the ten packs' scorers and drafts; `hooks/score.ts` turns each scorer's JSON into one shape; `hooks/locate.ts` says where packs install; `hooks/voice.ts` and `hooks/history.ts` the voice check and score history; `hooks/drift.ts` the cross-pack checks; `hooks/views.ts` the pack views' data; `hooks/analytics.ts` the stats, digest, outcomes and sprint steps; `types/index.d.ts` the `$.state` contract. Tests are in `tests/`, with the scorers' real output recorded in `tests/fixtures.ts`. `docs/ROADMAP.md` is the plan through v0.6. `evals/` holds the `claude plugin eval` suite (see below). The images in `assets/` are rendered from `spec.json` (with `card.mjs`), `lockup.html`, `demo.html` and `logo.svg`; the ones in `assets/screens/` are real terminal captures (`tmux capture-pane -e`) turned into pages by `assets/screens/ansi2html.py` and screenshotted.
 
 ## Privacy and security
 

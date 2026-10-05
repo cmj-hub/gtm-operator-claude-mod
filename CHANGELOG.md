@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.6.1] — 2026-10-05
+
+Found while capturing the screens in a live session.
+
+### Fixed
+- A gate refusal always says what to change: the scorer's fixes, else its reasons, else the axes furthest below their maximum (`raise hook (5/20): ...`). A draft at 79 against a minimum of 80 used to be refused with an empty list.
+- `gtm_score` takes `file` as well as `pack`, and scores that file; Claude reached for a path first and got "Unknown pack".
+- The Analytics tab labels CSV rows "imported from CSV", not "letter imported".
+
+### Added
+- `assets/screens/`: fourteen real terminal captures (hero, gate, band, every tab and view) and the converter that makes them; a Screens section in the README.
+
 ## [0.6.0] — 2026-10-05
 
 ### Added
