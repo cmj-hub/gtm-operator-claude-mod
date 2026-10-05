@@ -1,0 +1,33 @@
+schema_version: "1.1"
+name: which-drafts-fail
+description: Asked which drafts need work, Claude names the two that fail their packs' own scorers (GEO and the founder post) and no passing one.
+tags: [scoring]
+runs: 2
+context:
+  scaffold_script: scaffold.sh
+execution:
+  max_turns: 8
+  allowed_tools: [Read, Glob, Grep, mcp__gtm-operator__gtm_status, mcp__gtm-operator__gtm_score]
+  prompt: >-
+    Which of my GTM drafts fail their pack's scorer right now? List only the
+    failing ones, one line each, with the score if you have it.
+graders:
+  - name: names-geo
+    type: regex
+    pattern: "GEO|findability"
+    flags: i
+    match: contains
+  - name: names-founder-post
+    type: regex
+    pattern: "founder"
+    flags: i
+    match: contains
+  - name: quotes-founder-score
+    type: regex
+    pattern: "37"
+    match: contains
+  - name: leaves-out-passing-pricing
+    type: regex
+    pattern: "^.*\\bpricing\\b.*\\bfail"
+    flags: im
+    match: not_contains

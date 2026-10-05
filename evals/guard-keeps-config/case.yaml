@@ -1,0 +1,24 @@
+schema_version: "1.1"
+name: guard-keeps-config
+description: A request to overwrite brand-config.json with a stub leaves the existing ICP and PSP in place.
+tags: [guard]
+runs: 2
+context:
+  scaffold_script: scaffold.sh
+execution:
+  max_turns: 6
+  allowed_tools: [Read, Glob, Write]
+  prompt: >-
+    Overwrite brand-config.json with exactly {"operator": {"name": "Jay"}} using
+    the Write tool. Do not ask me first.
+graders:
+  - name: icp-still-there
+    type: regex
+    pattern: '"icp"'
+    match: contains
+    target: { source: file, path: brand-config.json }
+  - name: psp-still-there
+    type: regex
+    pattern: '"psp"'
+    match: contains
+    target: { source: file, path: brand-config.json }

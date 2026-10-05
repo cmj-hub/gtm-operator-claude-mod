@@ -1,0 +1,42 @@
+{
+  "channel_decision": "Search is a channel.",
+  "buyer_question": "geo agency, ai seo, answer engine optimization pricing",
+  "citation_record": {
+    "brand": "Example Co",
+    "observations": [
+      {
+        "engine": "ChatGPT",
+        "method": "remembered",
+        "query": "best geo agency Example Co",
+        "observed_at": "2026-10-01",
+        "run": 1,
+        "brands_named": [
+          "Rival Co"
+        ],
+        "cited_urls": [],
+        "brand_status": "named",
+        "evidence": ""
+      }
+    ]
+  },
+  "indexability_pass": {
+    "url": "https://example.com/geo",
+    "checked_at": "2026-10-01",
+    "status": 404,
+    "redirects": 3,
+    "robots": {
+      "Googlebot": "allowed",
+      "OAI-SearchBot": "blocked"
+    },
+    "noindex": false,
+    "in_sitemap": false,
+    "raw_html_has_answer": false
+  },
+  "brief": {
+    "page": "/geo",
+    "summary": "One page answering the question with our unique claim first.",
+    "unique_claim": "We are fast, friendly, and easy to work with.",
+    "follow_up_questions": []
+  },
+  "kill_date": "next quarter"
+}

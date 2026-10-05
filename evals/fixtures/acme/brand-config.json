@@ -1,0 +1,360 @@
+{
+  "operator": {
+    "name": "Your Name",
+    "company": "Your Company"
+  },
+  "icp": {
+    "segment": "Series-B SaaS, $20-50M ARR, PLG motion, US/EU",
+    "stage": "Series B",
+    "size_range": "$20M-$50M ARR",
+    "geos": [
+      "US",
+      "EU"
+    ],
+    "motion": "product-led growth + assisted sales",
+    "exclusion_criteria": [
+      "Pre-PMF (<$2M ARR)",
+      "Enterprise-only ACV >$100k average",
+      "Government / regulated"
+    ]
+  },
+  "psp_drafts": {
+    "primary": {
+      "signal": "Posted Demand Gen Lead role \u226414 days",
+      "pain": "Pipeline gap; existing demand-gen motion isn't producing enough SQLs",
+      "timing_trigger": "new-exec",
+      "felt_pain_role": "VP Demand Gen",
+      "vocabulary": [
+        "pipeline gap",
+        "SDR ramp",
+        "we keep closing wrong-fit logos",
+        "demand-gen motion isn't producing"
+      ],
+      "refreshed_at": "2026-09-08"
+    },
+    "secondary": null
+  },
+  "psp": {
+    "signal_anchors": [
+      "Posted Demand Gen Lead role \u226414 days"
+    ],
+    "primary_pain": "Pipeline gap; existing demand-gen motion isn't producing enough SQLs",
+    "timing_trigger": "new-exec",
+    "felt_pain_role": "VP Demand Gen",
+    "vocabulary": [
+      "pipeline gap",
+      "SDR ramp",
+      "we keep closing wrong-fit logos",
+      "demand-gen motion isn't producing"
+    ]
+  },
+  "signal_sources": {
+    "linkedin_job_search": true,
+    "crunchbase_news": true,
+    "rss_feeds": [],
+    "podcast_feeds": [],
+    "manual_research_only": false
+  },
+  "research_cadence": {
+    "psp_refresh_days": 90,
+    "vocabulary_refresh_days": 30,
+    "signal_freshness_window_days": 14
+  },
+  "evp_drafts": {
+    "tier_2_problem_aware": {
+      "primary": "If your demand-gen motion isn't producing SQLs, hiring 2 more SDRs won't fix it \u2014 the problem is upstream.",
+      "proof": "62% of Series-B SaaS hit this within 18 months of funding."
+    },
+    "tier_3_solution_aware": {
+      "primary": "For Series-B SaaS in a pipeline gap, we ship 14+ SQLs/month without hiring 2 more SDRs.",
+      "outcome": "14+ SQLs per month",
+      "tradeoff": "without hiring 2 more SDRs",
+      "proof": "Series-B SaaS hit 14 SQLs in 30 days from a PSP rewrite."
+    },
+    "tier_4_product_aware": {
+      "primary": "Versus generic agencies: targeted outbound CPM is $640 vs $2,800. Same volume, 4x efficiency.",
+      "competitor_referenced": "generic agencies",
+      "proof": "Compared CPM across 12 programs in 2025-2026."
+    }
+  },
+  "competitors": [
+    {
+      "name": "Generic outbound agency",
+      "axis": "CPM efficiency"
+    },
+    {
+      "name": "AI SDR vendor",
+      "axis": "Reply quality vs volume"
+    },
+    {
+      "name": "In-house SDR build",
+      "axis": "Time-to-payback"
+    }
+  ],
+  "evp": {
+    "tier": 3,
+    "primary": "For Series-B SaaS in a pipeline gap, we ship 14+ SQLs/month without hiring 2 more SDRs.",
+    "outcome": "14+ SQLs per month",
+    "tradeoff": "without hiring 2 more SDRs",
+    "proof": "Series-B SaaS hit 14 SQLs in 30 days from a PSP rewrite."
+  },
+  "primary_outreach_tier": 3,
+  "refresh_cadence_days": 90,
+  "$schema": "https://raw.githubusercontent.com/cmj-hub/claude-cold-email/main/brand-config.schema.json",
+  "tone": {
+    "register": "direct, conversational, founder-voice",
+    "banned_phrases": [
+      "Hope you're well",
+      "Just bumping this",
+      "Let me know your thoughts",
+      "Happy to chat whenever",
+      "Quick question"
+    ],
+    "preferred_phrases": [
+      "Worth 15 minutes?",
+      "Should I send the case study?"
+    ],
+    "first_person_singular_ok": true,
+    "swearing_ok": false,
+    "emoji_in_subject": false,
+    "emoji_in_body": false
+  },
+  "infrastructure": {
+    "sending_domain": "outreach.acmecloud.com",
+    "inbox_provider": "smartlead",
+    "warm_up_status": "ramped (60+ days, 80/day per mailbox)",
+    "deliverability_last_audited": "2026-05-20",
+    "dmarc_policy": "quarantine"
+  },
+  "operations": {
+    "weekly_cadence": {
+      "monday": "New PSP signals + list refresh",
+      "wednesday": "Sequence ship + reply triage",
+      "friday": "Score replies + adjust"
+    },
+    "reply_routing": {
+      "buy_signal": "Slack #pipeline + create HS deal",
+      "positive": "Reply within 4 hours",
+      "neutral": "Add to nurture stream",
+      "not_interested": "Suppress + log reason"
+    },
+    "experiment_log_path": "./experiments.md"
+  },
+  "customer": {
+    "psps": [
+      {
+        "slug": "series-b-saas-demand-gen-lead",
+        "summary": "Series-B SaaS, $20-50M ARR, demand-gen motion underperforming",
+        "primary_pain": "Pipeline gap; existing demand-gen isn't producing enough SQLs",
+        "vocabulary": [
+          "pipeline gap",
+          "SDR ramp",
+          "we keep closing wrong-fit logos"
+        ]
+      }
+    ],
+    "competitors": [
+      {
+        "name": "Competitor X",
+        "list_price": "$499/mo",
+        "psp_overlap": "partial"
+      }
+    ],
+    "buyer_personas": [
+      {
+        "role": "VP Demand Gen",
+        "budget_authority": "co-signer"
+      },
+      {
+        "role": "CEO / Founder",
+        "budget_authority": "final"
+      }
+    ]
+  },
+  "pricing": {
+    "currentTiers": [
+      {
+        "name": "Starter",
+        "price": 99,
+        "cadence": "monthly",
+        "value_metric_unit": "seat",
+        "value_metric_quantity": 5,
+        "features": [
+          "SSO",
+          "Basic reporting",
+          "Email support"
+        ]
+      },
+      {
+        "name": "Pro",
+        "price": 299,
+        "cadence": "monthly",
+        "value_metric_unit": "seat",
+        "value_metric_quantity": 25,
+        "features": [
+          "SSO",
+          "Basic reporting",
+          "Audit log",
+          "Priority support"
+        ]
+      },
+      {
+        "name": "Scale",
+        "price": 999,
+        "cadence": "monthly",
+        "value_metric_unit": "seat",
+        "value_metric_quantity": 100,
+        "features": [
+          "SSO",
+          "Basic reporting",
+          "Audit log",
+          "Priority support",
+          "Named CSM"
+        ]
+      }
+    ],
+    "valueMetric": {
+      "unit": "seat",
+      "scales_with_customer_success": true,
+      "gaming_risk": "low",
+      "alignment_score": 75
+    },
+    "wtpResearch": {
+      "method": "van-westendorp",
+      "lastConducted": "2026-03-15",
+      "n_respondents": 28,
+      "per_psp": true,
+      "results_path": "./pricing-research/wtp-2026q1.json"
+    },
+    "referenceAnchor": {
+      "frame": "inertia",
+      "quantified": "~$80K/year of internal time + tooling for the in-house alternative",
+      "copy_block_path": "./pricing-page/anchor-copy.md"
+    },
+    "pocketWaterfall": {
+      "lastReviewed": "2026-04-01",
+      "steps": [
+        "list",
+        "ramp_discount",
+        "volume_discount",
+        "annual_prepay",
+        "strategic_discount",
+        "implementation_credit",
+        "payment_terms"
+      ],
+      "total_leak_pct": 18.5,
+      "top_3_leaks": [
+        "ramp_discount",
+        "strategic_discount",
+        "annual_prepay"
+      ]
+    },
+    "discountPolicy": {
+      "documented": true,
+      "thresholds": {
+        "rep_authority": "0-10%",
+        "manager_authority": "10-20%",
+        "vp_authority": "20-30%",
+        "ceo_required": "30%+"
+      },
+      "reason_code_required_above_pct": 10,
+      "forbidden_reasons": [
+        "close the deal alone",
+        "competitor said they'd match"
+      ]
+    },
+    "tiers": {
+      "architecture": "three-tier-decoy",
+      "target_landing_distribution": {
+        "decoy": 8,
+        "target": 75,
+        "anchor": 17
+      },
+      "lastRebuilt": "2026-02-10"
+    },
+    "renewal": {
+      "cadence": "annual",
+      "priorNoticeDays": 90,
+      "grandfather_policy": "ramp-12-month",
+      "lastNoticeTemplate": "./pricing-page/renewal-notice.md"
+    },
+    "expansion": {
+      "triggers": [
+        {
+          "name": "usage_80_pct",
+          "action": "surface_upgrade_30_days_prior"
+        },
+        {
+          "name": "role_change",
+          "action": "reset_relationship"
+        },
+        {
+          "name": "adjacent_team",
+          "action": "treat_as_new_logo"
+        }
+      ]
+    },
+    "review": {
+      "cadence": "quarterly",
+      "nextScheduled": "2026-07-15",
+      "owners": [
+        "CEO",
+        "VP Sales",
+        "CFO",
+        "VP Product"
+      ],
+      "log": []
+    }
+  },
+  "audience": {
+    "primary_icp": "B2B founders / GTM operators evaluating outbound and demand-gen approaches",
+    "what_they_already_know": "they have a pipeline gap; some have tried agencies; most are skeptical of AI SDRs",
+    "what_they_don't_know_yet": "that the JMC framework anchors on PSPs not demographics"
+  },
+  "pillars": {
+    "pillar": {
+      "topic_pool": [
+        "Why most outbound programs fail at the PSP layer, not the SDR layer",
+        "The Schwartz model and why B2B copy ignores it",
+        "What 'compounding' actually means in GTM"
+      ]
+    },
+    "proof": {
+      "topic_pool": [
+        "Series-B SaaS hit 14 SQLs in 30 days from a PSP rewrite",
+        "Bootstrapped agency went 2% \u2192 11% reply rate by killing demographic targeting",
+        "DevTools company closed $80k ACV in 90 days after EVP retier"
+      ]
+    },
+    "process": {
+      "topic_pool": [
+        "The 5-component PSP framework",
+        "How to mine buyer vocabulary in 30 minutes",
+        "The 15-point pre-campaign deliverability check"
+      ]
+    },
+    "person": {
+      "topic_pool": [
+        "Why I refuse to write 'Hope you're well'",
+        "What I learned from shipping 3 outbound programs that failed",
+        "The exec hire that taught me about felt-pain vs buying-authority"
+      ]
+    }
+  },
+  "cadence": {
+    "posts_per_week": 4,
+    "rotation_order": [
+      "pillar",
+      "proof",
+      "process",
+      "person"
+    ],
+    "default_platform": "linkedin",
+    "auto_critique_before_post": true
+  },
+  "business_outcomes": {
+    "drive_to": "https://yourcompany.com/the-one-page-you-want-readers-on",
+    "lead_magnet": "https://yourcompany.com/your-free-worksheet",
+    "call_url": "https://yourcompany.com/book"
+  }
+}
