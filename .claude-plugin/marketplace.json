@@ -6,7 +6,7 @@
     "url": "https://jaymountconsulting.com"
   },
   "metadata": {
-    "description": "The GTM operator mod for Claude Code: a live board for the ten GTM operator skill packs."
+    "description": "The GTM operator mod for Claude Code: scores, cross-pack checks, views, a sprint and analytics for the ten GTM operator skill packs."
   },
   "plugins": [
     {

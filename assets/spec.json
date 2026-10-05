@@ -1,9 +1,9 @@
 {
   "renderer_version": 3,
   "title": "GTM operator mod",
-  "subtitle": "The next GTM step above your Claude Code prompt. A guard on your brand config.",
+  "subtitle": "Every GTM draft scored by its own skill pack, inside Claude Code.",
   "accent_color": "#00D4FF",
   "tagline_top": "Claude Code mod · Free · MIT",
-  "proof": "10 packs · 1 board · no network · no telemetry",
+  "proof": "10 packs · 6 views · 1 sprint · no telemetry",
   "cta": "github.com/cmj-hub/gtm-operator-claude-mod"
 }

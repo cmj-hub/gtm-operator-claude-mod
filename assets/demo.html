@@ -9,7 +9,7 @@ html,body{width:1600px;height:900px;background:#060609;font-family:'JetBrains Mo
 .bar span{margin-left:14px}
 .main{position:absolute;top:38px;left:0;right:0;bottom:0;display:flex}
 .tx{flex:1;padding:22px 28px;display:flex;flex-direction:column}
-.side{width:500px;border-left:1px solid #1B1B2E;padding:20px 24px}
+.side{width:560px;border-left:1px solid #1B1B2E;padding:20px 24px}
 .dim{color:#6E6E86}.c{color:#00D4FF}.g{color:#10B981}.b{font-weight:700;color:#EAEAF0}.o{color:#CC4714}
 .user{color:#EAEAF0}.user:before{content:'> ';color:#6E6E86}
 .dot:before{content:'● ';color:#EAEAF0}
@@ -22,49 +22,48 @@ html,body{width:1600px;height:900px;background:#060609;font-family:'JetBrains Mo
 .status{margin-top:8px;font-size:15px}
 .ttl{color:#EAEAF0;font-weight:700;margin-bottom:10px}
 .row{white-space:pre}
-.toast{position:absolute;top:58px;right:530px;background:#14142A;border:1px solid #2E2E50;border-radius:8px;padding:10px 16px;font-size:15px;color:#EAEAF0}
+.toast{position:absolute;bottom:170px;right:600px;background:#14142A;border:1px solid #2E2E50;border-radius:8px;padding:10px 16px;font-size:15px;color:#EAEAF0}
+.tabs{display:flex;gap:14px;margin-bottom:12px;font-size:14px;white-space:nowrap}.btns{white-space:nowrap;font-size:15px}.tabs .on{color:#00D4FF;font-weight:700}.y{color:#E5B53A}.r{color:#F05252}
 </style></head><body><div class="win">
 <div class="bar"><i></i><i></i><i></i><span>~/acme · claude</span></div>
-<div class="toast">GTM: Value line (EVP) done. Next: /prospect-list:who-to-contact</div>
 <div class="main">
 <div class="tx">
-<div class="user">/evp:evp</div>
+<div class="user">/founder-brand:founder-brand a post on the hiring freeze</div>
 <div class="gap"></div>
-<div class="dot">Three lines for three readers. The outreach line:</div>
-<div class="dim">&nbsp;&nbsp;"Catch renewal risk the week a new CRO starts, not the quarter after."</div>
+<div class="dot">Write(drafts/2026-10-04-proof-hiring.md)</div>
+<div class="o">&nbsp;&nbsp;⎿ gtm-operator: this Founder posts draft scores 45 with claude-founder-brand's</div>
+<div class="o">&nbsp;&nbsp;&nbsp;&nbsp;scorer, below the minimum of 60 set for this project. Fix these:</div>
+<div class="o">&nbsp;&nbsp;&nbsp;&nbsp;- open with one of the 5 hook archetypes, e.g. the number that happened</div>
+<div class="o">&nbsp;&nbsp;&nbsp;&nbsp;- add the number, unit and timeframe from the story</div>
 <div class="gap"></div>
-<div class="dot">Write(brand-config.json)</div>
-<div class="o">&nbsp;&nbsp;⎿ gtm-operator: this write would drop or change values that already exist</div>
-<div class="o">&nbsp;&nbsp;&nbsp;&nbsp;(icp.segment, psp.signal_anchors). Ask before changing a filled field.</div>
+<div class="dot">gtm_consistency</div>
+<div class="dim">&nbsp;&nbsp;⎿ Price tiers missing from the landing page: Starter, Growth, Scale.</div>
 <div class="gap"></div>
-<div class="dot">Update(brand-config.json)</div>
-<div class="dim">&nbsp;&nbsp;⎿ Added evp.primary, evp.tier, evp.proof</div>
-<div class="gap"></div>
-<div class="dot">I kept your ICP and PSP fields and only added the EVP block.</div>
+<div class="dot">Your scorer refused the draft. I'll open on the 30-day number from</div>
+<div>&nbsp;&nbsp;SOUL.md, then fix the page's tiers after.</div>
 <div class="grow"></div>
-<div class="band"><span class="b">GTM 3/11</span><span>Next: <span class="b">/prospect-list:who-to-contact</span><span class="dim"> — no list yet</span></span><span class="btn p">[ Use ]</span><span class="btn">[ Board ]</span><span class="btn">[ Hide ]</span></div>
+<div class="band"><span class="b">GTM 9/11</span><span class="y">2 to fix</span><span class="y">4 warnings</span><span>Next: <span class="b">/prospect-list:who-to-contact</span></span><span class="btn p">[ Use ]</span><span class="btn">[ Run ]</span><span class="btn">[ Board ]</span><span class="btn">[ Hide ]</span></div>
 <div class="prompt">&nbsp;</div>
-<div class="status dim">GTM 3/11 · next /prospect-list:who-to-contact</div>
+<div class="status dim">GTM 9/11 · 2 drafts to fix · 4 warnings · next /prospect-list:who-to-contact</div>
 </div>
 <div class="side">
 <div class="ttl">GTM board</div>
-<div class="b">3/11 steps in place</div>
-<div class="row">Operator: Jay, Acme</div>
-<div class="row">Buyer: Series-B SaaS, 50-200, US</div>
-<div class="row">Pain: reps miss renewal signals</div>
-<div class="row">Value line: Catch renewal risk…</div>
+<div class="tabs"><span class="on">1 Board</span><span>2 Detail</span><span>3 Health (4)</span><span>4 Views</span><span>5 Analytics</span></div>
+<div class="row">Buyer: Series-B SaaS, $20-50M ARR</div>
+<div class="row">Value line: we ship 14+ SQLs/month…</div>
 <div class="gap"></div>
-<div class="row dim">✓ 0. Setup</div>
-<div class="row dim">✓ 1. Profile (PSP)</div>
-<div class="row dim">✓ 2. Value line (EVP)</div>
+<div class="row">✓ 1. Profile (PSP)  <span class="g">100/100</span> <span class="c">▃▅█</span></div>
+<div class="row">✓ 2. Value line (EVP)  <span class="g">100/100</span></div>
 <div class="row b">▸ 3. Prospect list  <span class="c">/prospect-list:…</span></div>
-<div class="row">· 4. First touch</div>
-<div class="row">· 5. Offer</div>
-<div class="row">· 6. Pricing</div>
-<div class="row">· 7. Landing page</div>
-<div class="row">· 8. Email sequence</div>
-<div class="row">· 9. Findability (GEO)</div>
-<div class="row">· 10. Founder posts</div>
+<div class="row">✓ 4. First touch  <span class="g">pass</span></div>
+<div class="row">· 5. Offer  <span class="dim">/sales-offer:cold-offer</span></div>
+<div class="row">✓ 6. Pricing  <span class="g">pass</span></div>
+<div class="row">✓ 7. Landing page  <span class="g">pass</span></div>
+<div class="row">✓ 8. Email sequence  <span class="g">pass</span></div>
+<div class="row"><span class="r">✗</span> 9. Findability (GEO)  <span class="r">fail · 16 fixes</span></div>
+<div class="row"><span class="r">✗</span> 10. Founder posts  <span class="r">37/100 · 9 fixes</span></div>
 <div class="gap"></div>
-<div><span class="btn p">[ Fill next ]</span> <span class="btn">[ Refresh ]</span> <span class="btn">[ Show band ]</span></div>
+<div class="row">Next: /prospect-list:who-to-contact</div>
+<div class="gap"></div>
+<div class="btns"><span class="btn p">[ Fill next ]</span> <span class="btn">[ Run next ]</span> <span class="btn">[ Sprint ]</span></div>
 </div></div></div></body></html>

@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./assets/lockup.png" width="880" alt="GTM operator mod for Claude Code. The next go-to-market step above your prompt, a live board of all ten GTM skill packs, and a guard that keeps Claude from overwriting your brand config.">
+  <img src="./assets/lockup.png" width="880" alt="GTM operator mod for Claude Code. Scores every go-to-market draft with its own skill pack's scorer, catches drafts that drift apart across the ten packs, and runs the next pack for you.">
 </p>
 
 # GTM operator mod for Claude Code
@@ -16,12 +16,12 @@ The GTM operator mod is a Claude Code mod that scores every go-to-market draft w
 
 The band above your prompt now reads `GTM 2/11  Next: /evp:evp — no value line yet`. Press **Use** and the command is in your prompt.
 
-Part of the GTM operator suite — `/plugin install gtm@gtm-operator-skills` installs the ten skill packs this mod tracks.
+Part of the GTM operator suite — `/plugin install gtm@gtm-operator-skills` installs the ten skill packs this mod scores.
 
 > `/gtm:next` tells you the next step when you ask. The mod tells you before you ask, and stops the write that would have cost you your ICP.
 
 <p align="center">
-  <img src="./assets/demo.png" alt="Illustration of the gtm-operator mod in a Claude Code terminal: a refused write to brand-config.json, the band above the prompt reading GTM 3/11 Next /prospect-list:who-to-contact, and the GTM board pane listing the eleven steps with three done." width="100%">
+  <img src="./assets/demo.png" alt="Illustration of the gtm-operator mod in a Claude Code terminal: the score gate refuses a founder post that scores 45 against a minimum of 60 and lists the fixes, Claude's gtm_consistency tool flags price tiers missing from the landing page, the band reads GTM 9/11, 2 to fix, 4 warnings, and the GTM board pane shows each step's score from its own pack." width="100%">
 </p>
 
 ## What it does
@@ -159,7 +159,7 @@ What `claude plugin validate .` reports, so you can review it before installing:
 ## On the site
 
 - [Skill packs catalog](https://jaymountconsulting.com/skills) — install paths + every pack
-- [GTM operator suite](https://github.com/cmj-hub/gtm-operator-skills) — the ten packs this mod tracks
+- [GTM operator suite](https://github.com/cmj-hub/gtm-operator-skills) — the ten packs this mod scores
 
 ## Free, no signup
 
@@ -186,7 +186,7 @@ tsc -p .        # after Claude Code has loaded the mod once (it writes .claude-p
 
 ## Privacy and security
 
-It saves whether you hid the band and, per project, the score history and the outcomes you log, in Claude Code's plugin store under `~/.claude/plugins/store/`. Scoring runs the packs' own Python scorers on your machine; they read your draft and print JSON, with no network. Each turn it adds a short section to Claude's system prompt with the suite's state; that text comes from your own files. No network, no telemetry, no credentials. See [SECURITY.md](SECURITY.md).
+It saves whether you hid the band and, per project, the score history and the outcomes you log, in Claude Code's plugin store under `~/.claude/plugins/store/`. Scoring runs the packs' own Python scorers on your machine; they read your draft and print JSON, with no network. Each turn it adds a short section to Claude's system prompt with the suite's state; that text comes from your own files. No network unless you press **Check deliverability** (DNS lookups with `dig`), no telemetry, no credentials. See [SECURITY.md](SECURITY.md).
 
 ## License
 

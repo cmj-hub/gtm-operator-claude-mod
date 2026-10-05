@@ -497,9 +497,17 @@ function runNext($: $, command: string): void {
  */
 type Launch = 'run' | 'fill'
 
+// False in a -p run or the SDK: no prompt to fill, so the command is named instead.
+let isInteractive = true
+
 async function launch($: $, how: Launch, command: string): Promise<void> {
   if (how === 'run') runNext($, command)
-  else await $.prompt.fill({ text: command })
+  else if (isInteractive) await $.prompt.fill({ text: command })
+}
+
+/** What a 'fill' launch tells the person to do with the command. */
+function handoff(command: string, verb: string): string {
+  return isInteractive ? `${command} is in your prompt; send it to ${verb}` : `run ${command} to ${verb}`
 }
 
 /** Starts a sprint at the next open step, running through `target`. */
@@ -513,7 +521,7 @@ async function startSprint($: $, settings: Settings, target: number, how: Launch
   const startedAt = await $.clock.now()
   await update($, sprint, () => ({ current: pack.id, target, startedAt }))
   await launch($, how, pack.command)
-  const first = how === 'fill' ? `${pack.command} is in your prompt; send it to start` : `${pack.name} now`
+  const first = how === 'fill' ? handoff(pack.command, 'start') : `${pack.name} now`
   return `Sprint started: ${first}, then each pack through step ${target}. A pack only runs once the one before it passes its scorer. /gtm-sprint stop ends it.`
 }
 
@@ -732,6 +740,7 @@ export const register: Register = (on, options) => {
   const settings = settingsFrom(options)
 
   on('session.start', async ($, e, next) => {
+    isInteractive = e.isInteractive
     await $.command.register({
       name: 'gtm-board',
       description: 'GTM suite board: what is done, how each draft scores, and the next pack to run',
@@ -862,7 +871,7 @@ export const register: Register = (on, options) => {
       await afterSprintTurn($, settings, 'fill')
       const now = await read($, sprint)
       if (now === null) return { text: 'GTM sprint done.' }
-      return { text: now.paused ? `Still paused: ${now.paused}.` : `GTM sprint resumed: ${packById(now.current)?.command ?? ''} is in your prompt; send it to go on.` }
+      return { text: now.paused ? `Still paused: ${now.paused}.` : `GTM sprint resumed: ${handoff(packById(now.current)?.command ?? '', 'go on')}.` }
     }
     const match = /^(?:to\s+)?(\d+)$/.exec(arg)
     const target = match ? Math.min(10, Math.max(1, Number(match[1]))) : 10
