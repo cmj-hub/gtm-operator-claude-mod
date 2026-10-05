@@ -1,0 +1,13 @@
+{
+  "name": "gtm-operator",
+  "version": "0.1.0",
+  "description": "GTM operator suite cockpit: live pipeline pane, next-step band and status, and a merge-never-overwrite guard on brand-config.json and SOUL.md.",
+  "author": {
+    "name": "Jay Mount Consulting",
+    "url": "https://jaymountconsulting.com"
+  },
+  "types": "./types/index.d.ts",
+  "repository": "https://github.com/cmj-hub/gtm-operator-claude-mod",
+  "license": "MIT",
+  "homepage": "https://github.com/cmj-hub/gtm-operator-skills"
+}

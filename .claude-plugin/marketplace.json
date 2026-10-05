@@ -1,0 +1,20 @@
+{
+  "name": "gtm-operator-claude-mod",
+  "owner": {
+    "name": "Jay Mount Consulting",
+    "email": "jay@jaymountconsulting.com",
+    "url": "https://jaymountconsulting.com"
+  },
+  "metadata": {
+    "description": "The gtm-operator mod for Claude Code: a live cockpit for the GTM operator skill packs."
+  },
+  "plugins": [
+    {
+      "name": "gtm-operator",
+      "source": "./",
+      "description": "GTM operator suite cockpit: live pipeline pane, next-step band and status, and a merge-never-overwrite guard on brand-config.json and SOUL.md.",
+      "category": "suite",
+      "homepage": "https://github.com/cmj-hub/gtm-operator-claude-mod"
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+# Written by Claude Code at every load; regenerated, never edited.
+.claude-plugin/types/
+.DS_Store
+node_modules/
+*.log
