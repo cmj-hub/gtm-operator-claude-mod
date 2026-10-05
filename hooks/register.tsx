@@ -1,7 +1,8 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, PluginOptions, Register } from 'claude-code'
 
-import type { Finding, GtmBoard, History, PackId, Score, Scores, Tab, ToolRuns, ViewId } from '../types'
+import type { Finding, GtmBoard, History, Outcome, PackId, Score, Scores, Tab, ToolRuns, ViewId } from '../types'
+import { addOutcome, allStats, digest, duration, outcomesByVersion, outcomesKey, sprintStep } from './analytics'
 import { allFindings, hashOf } from './drift'
 import type { DraftFile, Snapshot, Upstream } from './drift'
 import {
@@ -40,6 +41,10 @@ const isGuardOff = atom({ plugin: 'gtm-operator', key: 'isGuardOff' } as const, 
 const findings = atom({ plugin: 'gtm-operator', key: 'findings' } as const, [])
 const view = atom({ plugin: 'gtm-operator', key: 'view' } as const, 'pricing')
 const toolRuns = atom({ plugin: 'gtm-operator', key: 'toolRuns' } as const, {})
+const sprint = atom({ plugin: 'gtm-operator', key: 'sprint' } as const, null)
+const outcomes = atom({ plugin: 'gtm-operator', key: 'outcomes' } as const, [])
+
+const TOOL_PREFIX = 'mcp__gtm-operator__'
 
 type $ = EngineInterface
 
@@ -392,6 +397,8 @@ async function restore($: $, settings: Settings): Promise<void> {
   const root = await projectRoot($)
   const saved = await $.store.get(historyKey(root))
   await update($, history, () => (saved !== null && typeof saved === 'object' ? (saved as History) : {}))
+  const log = await $.store.get(outcomesKey(root))
+  await update($, outcomes, () => (Array.isArray(log) ? (log as Outcome[]) : []))
   scoredKeys.clear()
   scorerPaths.clear()
   await refresh($, settings)
@@ -468,6 +475,113 @@ async function gate($: $, settings: Settings, path: string, content: string): Pr
   const fixes = (score.fixes.length > 0 ? score.fixes : score.reasons).slice(0, 5).map(one => `- ${one}`).join('\n')
   return `gtm-operator: this ${pack.name} draft scores ${score.score ?? score.status} with ${pack.repo}'s scorer, ` +
     `below the minimum of ${settings.minScore} set for this project. Fix these, then write it again:\n${fixes}`
+}
+
+// --- Actions, the sprint, analytics ----------------------------------------
+
+/**
+ * Runs a pack's slash command as if typed. Deferred to a timer: a command.run
+ * hook cannot start a turn while it holds one, and a slash command can only
+ * go through $.command.run, never $.prompt.submit.
+ */
+function runNext($: $, command: string): void {
+  const [name = '', ...rest] = command.replace(/^\//, '').split(' ')
+  $.clock.after(1, () => {
+    $.command.run({ command: name, args: rest.join(' ') }).catch(() => undefined)
+  })
+}
+
+/**
+ * How a sprint step starts: 'run' from a press or turn.complete, 'fill' (the
+ * prompt, for the person to send) from a slash command, which may not start a turn.
+ */
+type Launch = 'run' | 'fill'
+
+async function launch($: $, how: Launch, command: string): Promise<void> {
+  if (how === 'run') runNext($, command)
+  else await $.prompt.fill({ text: command })
+}
+
+/** Starts a sprint at the next open step, running through `target`. */
+async function startSprint($: $, settings: Settings, target: number, how: Launch): Promise<string> {
+  const found = await refresh($, settings)
+  const step = nextStep(found)
+  if (step === undefined) return 'Every step is in place; nothing to sprint through.'
+  if (step.n === 0) return 'Run /gtm:setup first; the sprint starts at the PSP.'
+  const pack = PACKS.find(one => one.step === step.n)
+  if (pack === undefined || step.n > target) return `The next step (${step.n}) is past the sprint's end (${target}).`
+  const startedAt = await $.clock.now()
+  await update($, sprint, () => ({ current: pack.id, target, startedAt }))
+  await launch($, how, pack.command)
+  const first = how === 'fill' ? `${pack.command} is in your prompt; send it to start` : `${pack.name} now`
+  return `Sprint started: ${first}, then each pack through step ${target}. A pack only runs once the one before it passes its scorer. /gtm-sprint stop ends it.`
+}
+
+/** After each main-thread turn of a sprint: score the step and go on, finish, or pause. */
+async function afterSprintTurn($: $, settings: Settings, how: Launch = 'run'): Promise<void> {
+  const active = await read($, sprint)
+  if (active === null || active.paused !== undefined) return
+  const current = packById(active.current)
+  if (current === undefined) return
+  await scoreAll($, settings, [current], true)
+  const verdict = sprintStep(active.current, active.target, await read($, scores))
+  if (verdict.kind === 'advance') {
+    const next = packById(verdict.next)
+    if (next === undefined) return
+    await update($, sprint, () => ({ ...active, current: next.id }))
+    $.ui.toast(`GTM sprint: ${current.name} passes. Next: ${next.command}`)
+    await launch($, how, next.command)
+  } else if (verdict.kind === 'done') {
+    await update($, sprint, () => null)
+    $.ui.toast(`GTM sprint done through step ${active.target}.`)
+  } else {
+    await update($, sprint, () => ({ ...active, paused: verdict.reason }))
+    $.ui.toast(`GTM sprint paused: ${verdict.reason}. Fix it, then /gtm-sprint resume.`)
+  }
+}
+
+async function logOutcome($: $, kind: Outcome['kind'], value: string): Promise<void> {
+  const root = await projectRoot($)
+  const letter = await readText($, `${root}/gtm/letter.json`).catch(() => undefined)
+  const letterScore = (await read($, scores)).letter
+  const entry: Outcome = {
+    at: await $.clock.now(),
+    kind,
+    count: Number(value.trim()),
+    version: letter === undefined ? 'no letter' : hashOf(letter).slice(0, 6),
+    ...(letterScore?.score !== undefined ? { score: letterScore.score } : {}),
+  }
+  const next = addOutcome(await read($, outcomes), entry)
+  if (next === undefined) {
+    $.ui.toast('GTM: enter a whole number, like 3.')
+    return
+  }
+  await update($, outcomes, () => next)
+  await $.store.set(outcomesKey(root), next)
+}
+
+async function weeklyDigest($: $): Promise<string> {
+  const found = await read($, board)
+  return digest({
+    now: await $.clock.now(),
+    history: await read($, history),
+    scores: await read($, scores),
+    findings: await read($, findings),
+    outcomes: await read($, outcomes),
+    ...(found && nextStep(found) ? { nextCommand: nextStep(found)?.command } : {}),
+  })
+}
+
+/** What the gtm_status tool and /gtm-board report, as text. */
+async function statusText($: $): Promise<string> {
+  const found = await read($, board)
+  if (found === null || !found.hasProject) return 'No GTM project here: no brand-config.json and no gtm/ folder. Run /gtm:setup.'
+  const all = await read($, scores)
+  const lines = PACKS.map(pack => {
+    const score = all[pack.id]
+    return `${pack.step}. ${pack.name} (${pack.command}): ${score ? scoreLabel(score) || score.status : 'not scored'}`
+  })
+  return `${summary(found)}\n${lines.join('\n')}`
 }
 
 // --- Drawing ---------------------------------------------------------------
@@ -641,6 +755,46 @@ export const register: Register = (on, options) => {
       argumentHint: '[on|off]',
       immediate: true,
     })
+    await $.command.register({
+      name: 'gtm-sprint',
+      description: 'Run the GTM packs in order, each only after the one before passes its scorer',
+      argumentHint: '[to <step>|stop|resume]',
+    })
+    await $.command.register({
+      name: 'gtm-digest',
+      description: 'The GTM weekly digest: what moved, what needs work, outcomes',
+      immediate: true,
+    })
+    await $.tool.register({
+      name: 'gtm_status',
+      description: 'GTM operator suite status for this project: which steps are done, the next pack command, and each draft\'s score from its pack\'s own scorer. Call before choosing which GTM pack to run.',
+    })
+    await $.tool.register({
+      name: 'gtm_score',
+      description: 'Score one GTM draft now with its pack\'s own scorer and return the score, reasons and fixes. Call after writing or editing a draft in gtm/, drafts/ or the psp/evp blocks of brand-config.json, before saying it is done.',
+      inputSchema: {
+        type: 'object',
+        properties: { pack: { type: 'string', description: `One of: ${PACKS.map(pack => pack.plugin).join(', ')}` } },
+        required: ['pack'],
+      },
+    })
+    await $.tool.register({
+      name: 'gtm_consistency',
+      description: 'Cross-pack checks for the GTM suite: drafts gone stale after a PSP/EVP/price change, a page that does not lead with the EVP or name the tiers, drafts missing the buyer\'s words, roles the prospect list leaves out. Heuristics; confirm before acting.',
+    })
+    await $.agent.register({
+      name: 'reviewer',
+      description: 'Reviews one GTM draft (gtm/*.json, drafts/*.md, or the psp/evp blocks) against the PSP, the EVP, SOUL.md and its pack\'s scorer, and returns what to change. Read-only.',
+      prompt: [
+        'You review one go-to-market draft for an operator using the GTM operator skill packs. You do not edit files.',
+        'Read brand-config.json (the psp and evp blocks, icp, tone) and SOUL.md (voice; "Phrases I refuse" are banned).',
+        `Call ${TOOL_PREFIX}gtm_score for the draft's pack and ${TOOL_PREFIX}gtm_consistency.`,
+        'Then check what a scorer cannot: is it in the buyer\'s words from psp.vocabulary, does it lead with the EVP line, is every claim backed by a receipt the operator gave, would the buyer named in the PSP stop on the first line?',
+        'Answer with: the score line, then at most five changes, most important first, each as "what is wrong -> what to write instead". Quote the draft. No praise, no summary.',
+      ].join('\n'),
+      tools: ['Read', 'Glob', 'Grep', `${TOOL_PREFIX}gtm_score`, `${TOOL_PREFIX}gtm_status`, `${TOOL_PREFIX}gtm_consistency`],
+      model: 'inherit',
+    })
     await restore($, settings)
     $.clock.every(30_000, () => void refresh($, settings, true))
 
@@ -693,6 +847,31 @@ export const register: Register = (on, options) => {
     if (found.length === 0) return { text: 'No cross-pack issues: no stale drafts, no disagreements, no missing buyers.' }
     await update($, tab, () => 'health')
     return { text: found.map(one => `- [${one.kind}] ${one.message}`).join('\n') }
+  })
+
+  on('command.run', { command: 'gtm-sprint' }, async ($, e) => {
+    const arg = e.args.trim().toLowerCase()
+    const active = await read($, sprint)
+    if (arg === 'stop') {
+      await update($, sprint, () => null)
+      return { text: active ? 'GTM sprint stopped.' : 'No GTM sprint is running.' }
+    }
+    if (arg === 'resume') {
+      if (active === null) return { text: 'No GTM sprint to resume. Start one with /gtm-sprint.' }
+      await update($, sprint, () => ({ current: active.current, target: active.target, startedAt: active.startedAt }))
+      await afterSprintTurn($, settings, 'fill')
+      const now = await read($, sprint)
+      if (now === null) return { text: 'GTM sprint done.' }
+      return { text: now.paused ? `Still paused: ${now.paused}.` : `GTM sprint resumed: ${packById(now.current)?.command ?? ''} is in your prompt; send it to go on.` }
+    }
+    const match = /^(?:to\s+)?(\d+)$/.exec(arg)
+    const target = match ? Math.min(10, Math.max(1, Number(match[1]))) : 10
+    return { text: await startSprint($, settings, target, 'fill') }
+  })
+
+  on('command.run', { command: 'gtm-digest' }, async ($, e) => {
+    await refresh($, settings)
+    return { text: await weeklyDigest($) }
   })
 
   on('command.run', { command: 'gtm-guard' }, async ($, e) => {
@@ -761,6 +940,46 @@ export const register: Register = (on, options) => {
     return ran
   })
 
+  on('tool.call', { tool: 'mcp__gtm-operator__gtm_status' }, async $ => {
+    await refresh($, settings)
+    const text = await statusText($)
+    return { result: text, text }
+  })
+
+  on('tool.call', { tool: 'mcp__gtm-operator__gtm_score' }, async ($, e) => {
+    const wanted = 'pack' in e && typeof e.pack === 'string' ? e.pack : ''
+    const pack = PACKS.find(one => one.plugin === wanted || one.id === wanted || one.repo === wanted)
+    if (pack === undefined) {
+      const text = `Unknown pack "${wanted}". Use one of: ${PACKS.map(one => one.plugin).join(', ')}.`
+      return { result: text, text, isError: true }
+    }
+    await scoreAll($, settings, [pack], true)
+    const score = (await read($, scores))[pack.id]
+    const lines = [
+      `${pack.name} (${pack.command}): ${score ? scoreLabel(score) || score.status : 'not scored'}`,
+      ...(score?.detail ? [score.detail] : []),
+      ...(score?.reasons ?? []).map(one => `reason: ${one}`),
+      ...(score?.fixes ?? []).map(one => `fix: ${one}`),
+      ...(score?.voice ?? []).map(one => `refused phrase from SOUL.md: ${one}`),
+    ]
+    const text = lines.join('\n')
+    return { result: text, text }
+  })
+
+  on('tool.call', { tool: 'mcp__gtm-operator__gtm_consistency' }, async $ => {
+    await refresh($, settings)
+    const found = await read($, findings)
+    const text = found.length === 0 ? 'No cross-pack issues found.' : found.map(one => `- [${one.kind}] ${one.message}`).join('\n')
+    return { result: text, text }
+  })
+
+  // The guided sprint moves on after each main-thread turn.
+  on('turn.complete', async ($, e, next) => {
+    const done = await next(e)
+    if (e.agentId === undefined && !e.isAborted && (await read($, sprint)) !== null) await afterSprintTurn($, settings)
+    return done
+  })
+
   on('prompt.compose', async ($, e, next) => {
     const composed = await next(e)
     const found = await read($, board)
@@ -818,6 +1037,7 @@ export const register: Register = (on, options) => {
               onPress={() => $.prompt.fill({ text: step.command })}
             />
           )}
+          {step !== undefined && <Button key="run" label="Run" onPress={() => runNext($, step.command)} />}
           <Button key="board" label="Board" onPress={() => $.ui.open({ id: PANE, title: 'GTM board' })} />
           <Button key="hide" label="Hide" onPress={() => setBandHidden($, true)} />
         </Box>
@@ -850,8 +1070,52 @@ export const register: Register = (on, options) => {
         <Button key="tab-detail" label="Detail" hotkey="2" plain onPress={() => update($, tab, () => 'detail' as Tab)} />
         <Button key="tab-health" label={`Health${health.length > 0 ? ` (${health.length})` : ''}`} hotkey="3" plain onPress={() => update($, tab, () => 'health' as Tab)} />
         <Button key="tab-views" label="Views" hotkey="4" plain onPress={() => loadView($, settings, current_view)} />
+        <Button key="tab-analytics" label="Analytics" hotkey="5" plain onPress={() => update($, tab, () => 'analytics' as Tab)} />
       </Box>
     )
+
+    if (current === 'analytics') {
+      const elements = $.ui.resolve(e)
+      const Input = 'Input' in elements ? elements.Input : undefined
+      const stats = allStats(past)
+      const log = await read($, outcomes)
+      const versions = outcomesByVersion(log)
+      const resolved = stats.reduce((sum, one) => sum + one.fixesResolved, 0)
+      return (
+        <Box flexDirection="column">
+          {tabs}
+          <Text> </Text>
+          <Text bold>{`Score history · ${resolved} fix${resolved === 1 ? '' : 'es'} resolved`}</Text>
+          {stats.length === 0 && <Text dimColor>No drafts scored yet.</Text>}
+          {stats.map(one => {
+            const pack = packById(one.pack)
+            const range = one.first !== undefined && one.last !== undefined ? `${one.first}→${one.last}` : `${one.samples} run${one.samples === 1 ? '' : 's'}`
+            const pass = one.draftsToPass === undefined ? 'not passing yet'
+              : one.draftsToPass === 0 ? 'passed first time'
+              : `passed after ${one.draftsToPass} failing draft${one.draftsToPass === 1 ? '' : 's'} (${duration(one.timeToPass ?? 0)})`
+            return <Text>{cut(`${(pack?.name ?? one.pack).padEnd(20)} ${sparkline(past[one.pack] ?? [], 10).padEnd(10)} ${range} · ${pass}`, width)}</Text>
+          })}
+          <Text> </Text>
+          <Text bold>Outcomes (log weekly; tied to the live cold email)</Text>
+          {versions.length === 0 && <Text dimColor>{cut('Nothing logged. The packs never read your CRM, so log replies and meetings here.', width)}</Text>}
+          {versions.map(row => (
+            <Text>{cut(`letter ${row.version}${row.score !== undefined ? ` (scored ${row.score})` : ''}: ${row.replies} replies · ${row.meetings} meetings`, width)}</Text>
+          ))}
+          {Input !== undefined && (
+            <Input key="outcome-replies" label="Replies this week" placeholder="a number" value="" submitLabel="log" onSubmit={(value: string) => logOutcome($, 'replies', value)} />
+          )}
+          {Input !== undefined && (
+            <Input key="outcome-meetings" label="Meetings this week" placeholder="a number" value="" submitLabel="log" onSubmit={(value: string) => logOutcome($, 'meetings', value)} />
+          )}
+          {Input === undefined && <Text dimColor>Log outcomes from the terminal or the Desktop app.</Text>}
+          <Text> </Text>
+          <Button key="digest" label="Copy weekly digest" onPress={async press => {
+            const copied = await $.ui.copy({ text: await weeklyDigest($), surface: press.surface })
+            $.ui.toast(copied.isCopied ? 'GTM: weekly digest copied.' : 'GTM: could not copy here; run /gtm-digest instead.')
+          }} />
+        </Box>
+      )
+    }
 
     if (current === 'health') {
       const kindLabel = { stale: 'Stale', consistency: 'Mismatch', coverage: 'Gap' } as const
@@ -957,6 +1221,7 @@ export const register: Register = (on, options) => {
     }
 
     const step = nextStep(found)
+    const running = await read($, sprint)
     const facts: [string, string][] = [
       ['Operator', found.operator],
       ['Buyer', found.segment],
@@ -971,6 +1236,14 @@ export const register: Register = (on, options) => {
         <Text bold>
           {doneCount(found)}/{found.steps.length} steps in place
         </Text>
+        {running !== null && (
+          <Box flexDirection="row" gap={1}>
+            <Text color={running.paused ? 'yellow' : 'cyan'}>
+              {cut(running.paused ? `Sprint paused: ${running.paused}` : `Sprint: ${packById(running.current)?.name ?? running.current}, through step ${running.target}`, width - 12)}
+            </Text>
+            <Button key="sprint-stop" label="Stop" onPress={() => update($, sprint, () => null)} />
+          </Box>
+        )}
         {facts.map(([label, value]) => (
           <Text dimColor={value === ''}>
             {cut(`${label}: ${value === '' ? '—' : value}`, width)}
@@ -1015,6 +1288,10 @@ export const register: Register = (on, options) => {
               variant="primary"
               onPress={() => $.prompt.fill({ text: step.command })}
             />
+          )}
+          {step !== undefined && <Button key="run-next" label="Run next" onPress={() => runNext($, step.command)} />}
+          {step !== undefined && step.n > 0 && running === null && (
+            <Button key="sprint" label="Sprint" onPress={() => startSprint($, settings, 10, 'run')} />
           )}
           <Button key="refresh" label="Rescore all" onPress={() => scoreAll($, settings, undefined, true)} />
           <Button key="band" label="Show band" onPress={() => setBandHidden($, false)} />

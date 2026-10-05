@@ -47,6 +47,9 @@ export type Fake = {
   write: (rel: string, text: string) => void
   /** Moves the clock the mod reads. */
   setNow: (ms: number) => void
+  submits: string[]
+  copies: string[]
+  registered: { commands: string[]; tools: string[]; agents: { name: string; tools?: readonly string[]; prompt: string }[] }
 }
 
 /** Extra tools that ship next to a pack's scorer, and the fixture each answers with. */
@@ -86,6 +89,9 @@ export function fake(on: On, options: FakeOptions = {}): Fake {
   const toasts: string[] = []
   const fills: string[] = []
   const runs: string[][] = []
+  const submits: string[] = []
+  const copies: string[] = []
+  const registered: Fake['registered'] = { commands: [], tools: [], agents: [] }
 
   const isDir = (path: string) => [...files.keys()].some(one => one.startsWith(`${path.replace(/\/$/, '')}/`))
   const children = (path: string) => {
@@ -119,6 +125,36 @@ export function fake(on: On, options: FakeOptions = {}): Fake {
     fills.push(e.text)
     return { isFilled: true }
   })
+  on('prompt.submit', (_$, e) => {
+    submits.push(e.text)
+    return { text: e.text }
+  })
+  on('ui.copy', (_$, e) => {
+    copies.push(e.text)
+    return { value: { isCopied: true } }
+  })
+  on('turn.complete', () => ({ text: '' }))
+  on('clock.after', () => ({ value: undefined }))
+  // Pack commands the mod runs (anything but its own, which it answers itself).
+  on('command.run', (_$, e) => {
+    submits.push(`/${e.command}${e.args ? ` ${e.args}` : ''}`)
+    return { text: '' }
+  })
+  // The 30-second refresh never fires in tests.
+  on('clock.every', () => ({ deny: 'no periodic timers in tests' }))
+  on('command.register', (_$, e) => {
+    registered.commands.push(e.name)
+    return { value: { command: e.name } }
+  })
+  on('tool.register', (_$, e) => {
+    registered.tools.push(e.name)
+    return { value: { tool: `mcp__gtm-operator__${e.name}` } }
+  })
+  on('agent.register', (_$, e) => {
+    registered.agents.push({ name: e.name, prompt: e.prompt, ...(e.tools ? { tools: e.tools } : {}) })
+    return { value: { agent: `gtm-operator:${e.name}` } }
+  })
+  on('session.start', (_$, e) => ({ cwd: ROOT }))
   on('store.get', (_$, e) => ({ value: store.get(e.key) }))
   on('store.set', (_$, e) => {
     store.set(e.key, e.value)
@@ -160,5 +196,5 @@ export function fake(on: On, options: FakeOptions = {}): Fake {
     return result(recorded.exitCode, recorded.stdout)
   })
 
-  return { files, store, toasts, fills, runs, write: put, setNow: ms => { now = ms } }
+  return { files, store, toasts, fills, runs, submits, copies, registered, write: put, setNow: ms => { now = ms } }
 }

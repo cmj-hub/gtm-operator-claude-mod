@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.5.0] — 2026-10-05
+
+Actions and analytics.
+
+### Added
+- **Run** on the band and **Run next** on the board run the next pack.
+- `/gtm-sprint [to <step>|stop|resume]` and the **Sprint** button: run the packs in order, each only after the one before passes its scorer.
+- Tools Claude can call: `gtm_status`, `gtm_score`, `gtm_consistency`.
+- `gtm-operator:reviewer`: a read-only subagent that reviews one draft against the PSP, EVP, SOUL.md and its scorer.
+- Analytics tab: score trends, drafts and time to pass, fixes resolved, and an outcome log (replies, meetings) tied to the live cold email.
+- `/gtm-digest` and **Copy weekly digest**.
+
 ## [0.4.0] — 2026-10-05
 
 What no single pack can see.

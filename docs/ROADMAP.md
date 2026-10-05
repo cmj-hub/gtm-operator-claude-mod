@@ -1,5 +1,7 @@
 # Roadmap: from step tracker to GTM cockpit
 
+Status: v0.3, v0.4 and v0.5 are implemented as described below.
+
 v0.2 tracks whether each pack's file exists. v0.3 to v0.5 make the mod show whether the work is good, catch problems between packs, and act on them. Every idea from the brainstorm is listed here with its version, design and test.
 
 ## Ground rules
@@ -42,11 +44,11 @@ v0.2 tracks whether each pack's file exists. v0.3 to v0.5 make the mod show whet
 
 | Idea | Design | Where |
 |---|---|---|
-| Run next | `$.prompt.submit` the next command (asks first via a confirm button). | button |
-| Guided sprint | `/gtm-sprint [to <step>]`: submits each pack in order; after each turn, scores it; continues only on pass; stop button. State in `$.state`. | `hooks/sprint.ts` |
+| Run next | **Run** on the band and **Run next** on the board run the next pack's command (`$.command.run`; `$.prompt.submit` refuses slash commands). | button |
+| Guided sprint | `/gtm-sprint [to <step>]`: after each main-thread turn (`turn.complete`), scores the step; runs the next pack only on pass, pauses on fail. A command hook may not start a turn, so `/gtm-sprint` and `resume` fill the prompt; the Sprint button and later steps run directly. | `hooks/analytics.ts` `sprintStep`, `register.tsx` |
 | Tools Claude can call | `gtm_status`, `gtm_score` (pack), `gtm_consistency`, served by `tool.call` hooks. | `register.tsx` |
 | Review subagent | `gtm-operator:reviewer`: read-only tools, prompt built from the PSP, EVP and SOUL.md rules. | `$.agent.register` |
-| Weekly digest | `/gtm-digest` writes `gtm/digest-YYYY-MM-DD.md`: score changes, stale drafts, fixes resolved, outcomes. | `hooks/digest.ts` |
+| Weekly digest | `/gtm-digest` prints it; **Copy weekly digest** copies it. The mod writes no file in your project, so saving it is your call. | `hooks/analytics.ts` |
 | Analytics | Trends per pack, time per step (from first file to pass), drafts to pass, fixes resolved. | Analytics tab |
 | Outcome log | Inputs for replies and meetings this week, stored with the live letter's hash. | Analytics tab |
 

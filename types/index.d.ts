@@ -73,7 +73,20 @@ export type ViewId = 'pricing' | 'prospects' | 'cold-email' | 'evp' | 'geo' | 'f
 /** Output of the extra pack tools a view runs (waterfall, decoy, lint, ...), by tool. */
 export type ToolRuns = Partial<Record<string, { at: number; exitCode: number; stdout: string; stderr: string }>>
 
-export type Tab = 'board' | 'detail' | 'health' | 'views'
+/** A logged result, tied to the letter version that was live. */
+export type Outcome = { at: number; kind: 'replies' | 'meetings'; count: number; version: string; score?: number }
+
+export type Sprint = {
+  /** The pack whose turn is running. */
+  current: PackId
+  /** Stop after this step number. */
+  target: number
+  startedAt: number
+  /** Why it paused, when it did. */
+  paused?: string
+}
+
+export type Tab = 'board' | 'detail' | 'health' | 'views' | 'analytics'
 
 declare module 'claude-code' {
   interface PluginState {
@@ -86,6 +99,8 @@ declare module 'claude-code' {
       findings: Finding[]
       view: ViewId
       toolRuns: ToolRuns
+      sprint: Sprint | null
+      outcomes: Outcome[]
       isBandHidden: boolean
       isGuardOff: boolean
     }
