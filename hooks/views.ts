@@ -278,6 +278,12 @@ export function shareBar(part: number, whole: number, width: number): string {
   return `${'█'.repeat(filled)}${'░'.repeat(width - filled)}`
 }
 
+/** A customer's leak as a whole percent: '-28%' kept below list, '+64%' above it (fees), '0%'. */
+export function leakLabel(leakPct: number): string {
+  const whole = Math.round(Math.abs(leakPct))
+  return whole === 0 ? '0%' : `${leakPct > 0 ? '-' : '+'}${whole}%`
+}
+
 export function money(value: number): string {
   return `$${Math.round(value).toLocaleString('en-US')}`
 }
