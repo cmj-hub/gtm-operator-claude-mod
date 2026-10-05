@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'claude-code/testing'
 
-import { addOutcome, digest, outcomesByVersion, packStats, sprintStep } from '../hooks/analytics'
+import { addOutcome, digest, importOutcomes, outcomesByVersion, packStats, parseOutcomeCsv, sprintStep } from '../hooks/analytics'
 import type { Scores } from '../types'
 import { BAND_PROPS, CONFIG, NOW, PANE_PROPS, ROOT, RUN, fake } from './fake'
 
@@ -22,6 +22,28 @@ describe('analytics', () => {
     expect(addOutcome([], { at: 1, kind: 'replies', count: 2.5, version: 'a' })).toBeUndefined()
     const log = addOutcome(addOutcome([], { at: 1, kind: 'replies', count: 4, version: 'a', score: 60 }) ?? [], { at: 2, kind: 'meetings', count: 1, version: 'a' }) ?? []
     expect(outcomesByVersion(log)).toEqual([{ version: 'a', replies: 4, meetings: 1, score: 60 }])
+  })
+
+  test('an outcome CSV: date plus replies and/or meetings, bad rows named', () => {
+    const parsed = parseOutcomeCsv('Week,Replies,Meetings,Notes\n2026-09-28,4,1,"good, week"\n2026-10-05,2,,\nnot a date,3,0\n2026-10-06,two,0\n')
+    expect(parsed.rows).toEqual([
+      { at: Date.parse('2026-09-28'), kind: 'replies', count: 4 },
+      { at: Date.parse('2026-09-28'), kind: 'meetings', count: 1 },
+      { at: Date.parse('2026-10-05'), kind: 'replies', count: 2 },
+      { at: Date.parse('2026-10-06'), kind: 'meetings', count: 0 },
+    ])
+    expect(parsed.errors).toEqual(['line 4: "not a date" is not a date', 'line 5: replies "two" is not a whole number'])
+    expect(parseOutcomeCsv('day,calls\n2026-09-28,3\n').errors).toEqual(['no date column, or no replies or meetings column'])
+  })
+
+  test('importing again replaces that day, it does not add twice', () => {
+    const rows = parseOutcomeCsv('date,replies\n2026-09-28,4\n').rows
+    const once = importOutcomes([{ at: 1, kind: 'replies', count: 9, version: 'abc123' }], rows)
+    const twice = importOutcomes(once, parseOutcomeCsv('date,replies\n2026-09-28,5\n').rows)
+    expect(twice).toEqual([
+      { at: 1, kind: 'replies', count: 9, version: 'abc123' },
+      { at: Date.parse('2026-09-28'), kind: 'replies', count: 5, version: 'imported' },
+    ])
   })
 
   test('the digest says what moved, what needs work, and what came back', () => {
@@ -55,7 +77,7 @@ describe('analytics', () => {
 test('session start registers the commands, the tools Claude can call, and the reviewer', async ($, on) => {
   const project = fake(on)
   await $.session.start({ surface: 'terminal', isInteractive: true, cwd: ROOT } as never)
-  expect(project.registered.commands).toEqual(['gtm-board', 'gtm-score', 'gtm-health', 'gtm-guard', 'gtm-sprint', 'gtm-digest'])
+  expect(project.registered.commands).toEqual(['gtm-board', 'gtm-score', 'gtm-health', 'gtm-guard', 'gtm-sprint', 'gtm-digest', 'gtm-outcomes'])
   expect(project.registered.tools).toEqual(['gtm_status', 'gtm_score', 'gtm_consistency'])
   const reviewer = project.registered.agents[0]
   expect(reviewer?.name).toBe('reviewer')
@@ -157,4 +179,24 @@ test('analytics: log outcomes, see history, copy the digest', async ($, on) => {
   const ran = await $.command.run({ command: 'gtm-digest', ...RUN })
   expect(ran.text).toContain('## What needs work')
   expect(ran.text).toContain('- Replies: 8')
+})
+
+test('/gtm-outcomes import reads a CSV from the project into the outcome log', async ($, on) => {
+  const project = fake(on, { files: {
+    'brand-config.json': JSON.stringify(CONFIG),
+    'crm/outcomes.csv': 'date,replies,meetings\n2026-10-01,6,2\n2026-10-02,x,1\n',
+  } })
+  const ran = await $.command.run({ command: 'gtm-outcomes', ...RUN, args: 'import crm/outcomes.csv' })
+  expect(ran.text).toBe('Imported 3 outcome rows from crm/outcomes.csv. Skipped: line 3: replies "x" is not a whole number.')
+  expect(project.store.get(`outcomes:${ROOT}`)).toMatchObject([
+    { kind: 'replies', count: 6, version: 'imported' },
+    { kind: 'meetings', count: 2, version: 'imported' },
+    { kind: 'meetings', count: 1, version: 'imported' },
+  ])
+  const missing = await $.command.run({ command: 'gtm-outcomes', ...RUN, args: 'import nope.csv' })
+  expect(missing.text).toBe('No file at nope.csv (paths are from the project root).')
+  const outside = await $.command.run({ command: 'gtm-outcomes', ...RUN, args: 'import ../secrets.csv' })
+  expect(outside.text).toBe('Give a path inside the project, like crm/outcomes.csv.')
+  const listed = await $.command.run({ command: 'gtm-outcomes', ...RUN })
+  expect(listed.text).toContain('imported: 6 replies · 3 meetings')
 })

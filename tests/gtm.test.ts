@@ -132,3 +132,20 @@ test('a guard that fails refuses the write to brand-config.json', async ($, on) 
   expect(ran.deny).toContain('the merge check on brand-config.json failed')
   expect(isWritten).toBe(false)
 })
+
+test('the band drops the reason for the next step when it would not fit beside a docked pane', async ($, on) => {
+  fake(on)
+  on('ui.render', () => ({ type: 'Text', props: {}, children: [''] }))
+  await $.command.run({ command: 'gtm-board', ...RUN })
+  for (const [columns, isShown] of [[200, true], [70, false]] as const) {
+    const band = await $.ui.mount({
+      plugin: 'gtm-operator',
+      surface: 'terminal',
+      component: 'AbovePrompt',
+      props: { ...BAND_PROPS, bodyColumns: columns },
+    })
+    expect(await band.find({ type: 'Text', text: 'GTM 2/11' })).toBeDefined()
+    expect(await band.find({ type: 'Text', text: /no value line yet/ }) !== undefined).toBe(isShown)
+    await band.unmount()
+  }
+})

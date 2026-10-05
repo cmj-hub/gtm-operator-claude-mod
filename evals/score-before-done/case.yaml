@@ -1,0 +1,28 @@
+schema_version: "1.1"
+name: score-before-done
+description: After writing a founder post, Claude scores it with the pack's own scorer before calling it ready.
+tags: [tools, scoring]
+runs: 2
+context:
+  scaffold_script: scaffold.sh
+execution:
+  max_turns: 12
+  allowed_tools: [Read, Glob, Grep, Write, Edit, mcp__gtm-operator__gtm_score, mcp__gtm-operator__gtm_status]
+  prompt: >-
+    Write a short LinkedIn post for our founder about one lesson from the hiring
+    freeze, and save it as drafts/2026-10-05-proof-freeze.md. Tell me when it is
+    ready to publish.
+graders:
+  - name: post-saved
+    type: file_exists
+    path: drafts/2026-10-05-proof-freeze.md
+  - name: scores-the-post
+    type: tool_used
+    tool: mcp__gtm-operator__gtm_score
+    input_match: founder
+    arm: with-only
+  - name: scores-after-writing
+    type: tool_order
+    before: Write
+    after: mcp__gtm-operator__gtm_score
+    arm: with-only

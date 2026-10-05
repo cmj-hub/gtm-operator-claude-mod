@@ -2,7 +2,7 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, PluginOptions, Register } from 'claude-code'
 
 import type { Finding, GtmBoard, History, Outcome, PackId, Score, Scores, Tab, ToolRuns, ViewId } from '../types'
-import { addOutcome, allStats, digest, duration, outcomesByVersion, outcomesKey, sprintStep } from './analytics'
+import { addOutcome, allStats, digest, duration, importOutcomes, outcomesByVersion, outcomesKey, parseOutcomeCsv, sprintStep } from './analytics'
 import { allFindings, hashOf } from './drift'
 import type { DraftFile, Snapshot, Upstream } from './drift'
 import {
@@ -23,8 +23,8 @@ import { newestFirst, scorerCandidates } from './locate'
 import { PACKS, packById, packForPath } from './packs'
 import type { PackDef, ScorerInput } from './packs'
 import { fixPrompt, normalize, scoreLabel } from './score'
-import { draftText, refusedPhrases, voiceHits } from './voice'
-import { coldEmailView, evpLadder, founderView, geoView, money, pricingView, prospectBoard, shareBar } from './views'
+import { draftExcerpt, draftText, refusedPhrases, voiceHits } from './voice'
+import { coldEmailView, evpLadder, founderView, geoView, leakLabel, money, pricingView, prospectBoard, shareBar } from './views'
 
 const PANE = 'gtm-board'
 const CONFIG = 'brand-config.json'
@@ -215,7 +215,7 @@ async function scorePack($: $, settings: Settings, pack: PackDef, isForced: bool
     ? await runScorer($, settings, pack, draft.input)
     : { pack: pack.id, status: 'unknown' as const, reasons: [], fixes: [], axes: [], detail: 'runScorers is off', at: await $.clock.now() }
   const voice = voiceHits(draftText(draft.text), phrases)
-  return { ...scored, ...(voice.length > 0 ? { voice } : {}), excerpt: draftText(draft.text).slice(0, 600) }
+  return { ...scored, ...(voice.length > 0 ? { voice } : {}), excerpt: draftExcerpt(draft.text).slice(0, 600) }
 }
 
 async function saveHistory($: $, root: string, next: History): Promise<void> {
@@ -548,6 +548,8 @@ async function afterSprintTurn($: $, settings: Settings, how: Launch = 'run'): P
   }
 }
 
+const countOf = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
+
 async function logOutcome($: $, kind: Outcome['kind'], value: string): Promise<void> {
   const root = await projectRoot($)
   const letter = await readText($, `${root}/gtm/letter.json`).catch(() => undefined)
@@ -631,7 +633,7 @@ async function drawView($: $, e: RenderEvent, settings: Settings, id: ViewId, wi
         {priceView.contrastSet.length > 0 && line(`Contrast set: ${priceView.contrastSet.join(' · ')}`)}
         {priceView.customers.length > 0 && <Text> </Text>}
         {priceView.customers.length > 0 && line(`Pocket-price waterfall: ${money(priceView.totalPocket)} kept of ${money(priceView.totalList)} list`, { bold: true })}
-        {priceView.customers.map(one => line(`${one.id.padEnd(10)} ${shareBar(one.pocket, Math.max(one.list, one.pocket), barWidth)} ${money(one.pocket)} of ${money(one.list)} (${one.leakPct >= 0 ? '-' : '+'}${Math.abs(one.leakPct)}%)`))}
+        {priceView.customers.map(one => line(`${one.id.padEnd(10)} ${shareBar(one.pocket, Math.max(one.list, one.pocket), barWidth)} ${money(one.pocket)} of ${money(one.list)} (${leakLabel(one.leakPct)})`))}
         {priceView.byStep.length > 0 && line(`Biggest leaks: ${priceView.byStep.slice(0, 3).map(step => `${step.name} ${money(step.leak)}`).join(', ')}`, { color: 'yellow' })}
         {priceView.checks.length > 0 && <Text> </Text>}
         {priceView.checks.length > 0 && line(`Tier contrast check${priceView.tiersScore !== undefined ? `: ${priceView.tiersScore}/100` : ''}`, { bold: true })}
@@ -774,6 +776,12 @@ export const register: Register = (on, options) => {
       description: 'The GTM weekly digest: what moved, what needs work, outcomes',
       immediate: true,
     })
+    await $.command.register({
+      name: 'gtm-outcomes',
+      description: 'GTM outcome log: replies and meetings per cold email version; import <file.csv> reads date, replies, meetings',
+      argumentHint: '[import <file.csv>]',
+      immediate: true,
+    })
     await $.tool.register({
       name: 'gtm_status',
       description: 'GTM operator suite status for this project: which steps are done, the next pack command, and each draft\'s score from its pack\'s own scorer. Call before choosing which GTM pack to run.',
@@ -881,6 +889,30 @@ export const register: Register = (on, options) => {
   on('command.run', { command: 'gtm-digest' }, async ($, e) => {
     await refresh($, settings)
     return { text: await weeklyDigest($) }
+  })
+
+  on('command.run', { command: 'gtm-outcomes' }, async ($, e) => {
+    const root = await projectRoot($)
+    const [verb = '', ...rest] = e.args.trim().split(/\s+/)
+    if (verb === 'import') {
+      const rel = rest.join(' ').replace(/^\.\//, '')
+      if (rel === '' || rel.startsWith('/') || rel.split(/[\\/]/).includes('..')) {
+        return { text: 'Give a path inside the project, like crm/outcomes.csv.' }
+      }
+      const text = await readText($, `${root}/${rel}`).catch(() => undefined)
+      if (text === undefined) return { text: `No file at ${rel} (paths are from the project root).` }
+      const parsed = parseOutcomeCsv(text)
+      const next = importOutcomes(await read($, outcomes), parsed.rows)
+      await update($, outcomes, () => next)
+      await $.store.set(outcomesKey(root), next)
+      const skipped = parsed.errors.length > 0 ? ` Skipped: ${parsed.errors.join('; ')}.` : ''
+      return { text: `Imported ${parsed.rows.length} outcome row${parsed.rows.length === 1 ? '' : 's'} from ${rel}.${skipped}` }
+    }
+    const rows = outcomesByVersion(await read($, outcomes))
+    if (rows.length === 0) return { text: 'No outcomes logged. Log them on the board\'s Analytics tab, or /gtm-outcomes import <file.csv> (columns: date, replies, meetings).' }
+    return {
+      text: rows.map(row => `${row.version}: ${countOf(row.replies, 'reply', 'replies')} · ${countOf(row.meetings, 'meeting', 'meetings')}${row.score !== undefined ? ` · letter scored ${row.score}` : ''}`).join('\n'),
+    }
   })
 
   on('command.run', { command: 'gtm-guard' }, async ($, e) => {
@@ -1027,17 +1059,29 @@ export const register: Register = (on, options) => {
     const count = `GTM ${doneCount(found)}/${found.steps.length}`
     const failing = failingCount(await read($, scores))
     const warnings = (await read($, findings)).length
+    const fixText = failing > 0 ? `${failing} to fix` : ''
+    const warnText = warnings > 0 ? `${warnings} warning${warnings === 1 ? '' : 's'}` : ''
+    // The reason for the next step goes first when the row is short of room,
+    // as it is beside a docked pane: the labels and buttons never wrap.
+    const BUTTONS = '[ Use ] [ Run ] [ Board ] [ Hide ]'.length
+    const fixed = [count, fixText, warnText].filter(one => one !== '').reduce((n, one) => n + one.length + 1, 0) + BUTTONS + 1
+    const showWhy = step !== undefined &&
+      fixed + `Next: ${step.command} — ${step.why}`.length <= e.props.bodyColumns
 
     return (
       <Box flexDirection="column">
         {theirs}
         <Box flexDirection="row" gap={1}>
-          <Text bold>{count}</Text>
-          {failing > 0 && <Text color="yellow">{`${failing} to fix`}</Text>}
-          {warnings > 0 && <Text color="yellow">{`${warnings} warning${warnings === 1 ? '' : 's'}`}</Text>}
+          <Box flexShrink={0}><Text bold>{count}</Text></Box>
+          {fixText !== '' && <Box flexShrink={0}><Text color="yellow">{fixText}</Text></Box>}
+          {warnText !== '' && <Box flexShrink={0}><Text color="yellow">{warnText}</Text></Box>}
           {step === undefined
             ? <Text dimColor>every step in place</Text>
-            : <Text>Next: <Text bold>{step.command}</Text><Text dimColor> — {step.why}</Text></Text>}
+            : (
+              <Box flexShrink={1}>
+                <Text wrap="truncate-end">Next: <Text bold>{step.command}</Text>{showWhy && <Text dimColor> — {step.why}</Text>}</Text>
+              </Box>
+            )}
           {step !== undefined && (
             <Button
               key="use"
@@ -1106,9 +1150,9 @@ export const register: Register = (on, options) => {
           })}
           <Text> </Text>
           <Text bold>Outcomes (log weekly; tied to the live cold email)</Text>
-          {versions.length === 0 && <Text dimColor>{cut('Nothing logged. The packs never read your CRM, so log replies and meetings here.', width)}</Text>}
+          {versions.length === 0 && <Text dimColor>{cut('Nothing logged. The packs never read your CRM: log replies and meetings here, or /gtm-outcomes import <file.csv>.', width)}</Text>}
           {versions.map(row => (
-            <Text>{cut(`letter ${row.version}${row.score !== undefined ? ` (scored ${row.score})` : ''}: ${row.replies} replies · ${row.meetings} meetings`, width)}</Text>
+            <Text>{cut(`letter ${row.version}${row.score !== undefined ? ` (scored ${row.score})` : ''}: ${countOf(row.replies, 'reply', 'replies')} · ${countOf(row.meetings, 'meeting', 'meetings')}`, width)}</Text>
           ))}
           {Input !== undefined && (
             <Input key="outcome-replies" label="Replies this week" placeholder="a number" value="" submitLabel="log" onSubmit={(value: string) => logOutcome($, 'replies', value)} />
@@ -1200,7 +1244,7 @@ export const register: Register = (on, options) => {
             <Text color="yellow">{cut(`Refused phrases from SOUL.md: ${score?.voice?.join(', ')}`, width)}</Text>
           )}
           {score?.excerpt && <Text> </Text>}
-          {score?.excerpt && <Text dimColor>{cut(score.excerpt.replace(/\s+/g, ' '), width * 3)}</Text>}
+          {score?.excerpt?.split('\n').filter(line => line.trim() !== '').slice(0, 8).map(line => <Text dimColor>{cut(line.replace(/\s+/g, ' '), width)}</Text>)}
           <Text> </Text>
           <Box flexDirection="row" gap={1}>
             <Button key="prev" label={`← ${prev.name}`} onPress={() => update($, selected, () => prev.id)} />

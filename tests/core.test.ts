@@ -4,7 +4,7 @@ import { addSample, sparkline, trend } from '../hooks/history'
 import { newestFirst, scorerCandidates } from '../hooks/locate'
 import { PACKS, packForPath } from '../hooks/packs'
 import { fixPrompt, normalize, scoreLabel } from '../hooks/score'
-import { draftText, refusedPhrases, voiceHits } from '../hooks/voice'
+import { draftExcerpt, draftText, refusedPhrases, voiceHits } from '../hooks/voice'
 import type { History } from '../types'
 import { FIXTURES } from './fixtures'
 
@@ -76,6 +76,14 @@ describe('locate', () => {
 })
 
 describe('voice', () => {
+  test('the detail excerpt labels each field of a JSON draft', () => {
+    expect(draftExcerpt(JSON.stringify({ psp: { signal: 'Posted a role', vocabulary: ['pipeline gap', 'SDR ramp'] } })))
+      .toBe('signal: Posted a role\nvocabulary: pipeline gap, SDR ramp')
+    expect(draftExcerpt(JSON.stringify([{ title: 'VP Sales', score: 'call this week' }])))
+      .toBe('title: VP Sales\nscore: call this week')
+    expect(draftExcerpt('A plain post.')).toBe('A plain post.')
+  })
+
   const soul = '## Who I am\nJay\n\n## Phrases I refuse\n- synergy\n- "circle back"\n\n## Stories\n- the Acme save\n'
 
   test('reads the refused phrases section only', () => {

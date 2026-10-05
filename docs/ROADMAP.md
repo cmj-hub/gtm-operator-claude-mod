@@ -1,6 +1,6 @@
 # Roadmap: from step tracker to GTM cockpit
 
-Status: v0.3, v0.4 and v0.5 are implemented as described below.
+Status: v0.3 to v0.6 are implemented as described below.
 
 v0.2 tracks whether each pack's file exists. v0.3 to v0.5 make the mod show whether the work is good, catch problems between packs, and act on them. Every idea from the brainstorm is listed here with its version, design and test.
 
@@ -55,3 +55,11 @@ v0.2 tracks whether each pack's file exists. v0.3 to v0.5 make the mod show whet
 ## Tests
 
 Every behaviour gets a `claude plugin test` case, drawn on terminal and desktop when it draws; pure logic gets unit tests in the same suite. Scorer runs are stubbed with recorded JSON from each pack's examples.
+
+## v0.6: proven in a real session
+
+| Idea | Design | Where |
+|---|---|---|
+| Live terminal check | Run the mod in interactive Claude Code on a sample project with the ten packs installed; fix what draws wrong. | band, waterfall, Detail fixes |
+| Eval suite | `claude plugin eval` cases with a no-mod baseline: guard, failing drafts, score before done. | `evals/` |
+| Outcome import | `/gtm-outcomes import <file.csv>`: date plus replies and/or meetings; re-import replaces. | `hooks/analytics.ts` |

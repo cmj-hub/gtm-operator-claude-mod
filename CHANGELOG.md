@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.6.0] — 2026-10-05
+
+### Added
+- `/gtm-outcomes`: replies and meetings per cold email version, and `/gtm-outcomes import <file.csv>` to read them from a CRM export or spreadsheet (a `date` column plus `replies` and/or `meetings`). Importing the same dates again replaces them; bad rows are named and skipped.
+- An eval suite (`evals/`, `claude plugin eval`) with a manual CI workflow: the guard keeps the brand config, Claude names the failing drafts, and Claude scores a new post before calling it ready.
+
+### Fixed (found running the mod in a real terminal)
+- The band no longer wraps its labels into two-line columns beside a docked pane; it drops the reason for the next step when the row is short.
+- The pricing waterfall shows whole percents (`-28%`, `0%`, `+64%`), not `-0%` or `+63.78%`.
+- The Detail tab shows a JSON draft as labelled lines (`primary_pain: ...`) instead of one run-on line.
+
 ## [0.5.1] — 2026-10-05
 
 Found by running v0.5.0 on a sample project with the ten packs installed from the marketplace.

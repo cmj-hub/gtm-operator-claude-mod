@@ -2,7 +2,7 @@ import { describe, expect, test } from 'claude-code/testing'
 
 import { allFindings, consistencyFindings, coverageFindings, hashOf, staleFindings } from '../hooks/drift'
 import type { Snapshot } from '../hooks/drift'
-import { coldEmailView, evpLadder, founderView, geoView, pricingView, prospectBoard } from '../hooks/views'
+import { coldEmailView, evpLadder, founderView, geoView, leakLabel, pricingView, prospectBoard } from '../hooks/views'
 import { CONFIG, NOW, PANE_PROPS, ROOT, RUN, fake } from './fake'
 import { FIXTURES } from './fixtures'
 
@@ -66,6 +66,10 @@ describe('view models', () => {
     expect(view.byStep[0]?.name).toBe('ramp')
     expect(view.checks.some(check => !check.passed)).toBe(true)
     expect(view.valueMetric).toBe('per seat')
+  })
+
+  test('pricing: the leak is a whole percent, signed by which way the price moved', () => {
+    expect([28, 32.72, 0, -0.2, -63.78].map(leakLabel)).toEqual(['-28%', '-33%', '0%', '0%', '+64%'])
   })
 
   test('prospects: one column per slot', () => {
