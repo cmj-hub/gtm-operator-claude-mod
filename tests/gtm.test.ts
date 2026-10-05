@@ -1,46 +1,16 @@
-import type { On } from 'claude-code'
 import { expect, test } from 'claude-code/testing'
 
-const ROOT = '/work/acme'
-const RUN = {
-  args: '',
-  origin: { kind: 'composer' },
-  presentation: { isFullscreen: false, columns: 120 },
-} as const
-
-const CONFIG = {
-  operator: { name: 'Jay', company: 'Acme' },
-  icp: { segment: 'Series-B SaaS, 50-200 people, US', role_targets: ['VP Sales', 'CRO'] },
-  psp: { primary_pain: 'reps miss renewal signals', signal_anchors: ['new CRO hired'] },
-}
-
-// A project with setup and psp done, served beneath the plugin.
-function project(on: On, failedRoots = 0) {
-  const files: Record<string, string> = { 'brand-config.json': JSON.stringify(CONFIG, null, 2) }
-  const strip = (path: string) => path.replace(`${ROOT}/`, '')
-  let roots = 0
-  on('session.root', () => (++roots <= failedRoots ? { deny: 'unavailable' } : { value: ROOT }))
-  on('ui.status', () => ({ value: undefined }))
-  on('ui.open', () => ({ value: { isPlaced: true } }))
-  on('clock.now', () => ({ value: Date.UTC(2026, 9, 5) }))
-  on('fs.exists', (_$, e) => ({ value: strip(e.path) in files }))
-  on('fs.read', (_$, e) => {
-    const text = files[strip(e.path)]
-    return text === undefined ? { deny: 'ENOENT' } : { value: text }
-  })
-  on('fs.list', (_$, e) => (e.path === `${ROOT}/gtm` ? { value: [] } : { deny: 'ENOENT' }))
-  return files
-}
+import { BAND_PROPS, CONFIG, PANE_PROPS, ROOT, RUN, fake } from './fake'
 
 test('/gtm-board names the value line as the next step', async ($, on) => {
-  project(on)
+  fake(on)
   const ran = await $.command.run({ command: 'gtm-board', ...RUN })
   expect(ran.text).toContain('Done: 0, 1')
   expect(ran.text).toContain('Next: /evp:evp')
 })
 
 test('a Write that drops a filled brand-config value is refused', async ($, on) => {
-  project(on)
+  fake(on)
   on('tool.call', () => ({ result: { type: 'create' }, text: 'written' }))
   const ran = await $.tool.call({
     tool: 'Write',
@@ -52,7 +22,7 @@ test('a Write that drops a filled brand-config value is refused', async ($, on) 
 })
 
 test('a Write that only adds fields goes through', async ($, on) => {
-  project(on)
+  fake(on)
   let isWritten = false
   on('tool.call', () => {
     isWritten = true
@@ -67,8 +37,12 @@ test('a Write that only adds fields goes through', async ($, on) => {
 })
 
 test('an Edit that removes a SOUL.md section is refused, and /gtm-guard off lets it through', async ($, on) => {
-  const files = project(on)
-  files['SOUL.md'] = '## Who I am\nJay\n\n## Phrases I refuse\n- synergy\n'
+  fake(on, {
+    files: {
+      'brand-config.json': JSON.stringify(CONFIG),
+      'SOUL.md': '## Who I am\nJay\n\n## Phrases I refuse\n- synergy\n',
+    },
+  })
   let edits = 0
   on('tool.call', () => {
     edits += 1
@@ -90,35 +64,29 @@ test('an Edit that removes a SOUL.md section is refused, and /gtm-guard off lets
 })
 
 test('the board pane and the band draw the next step on terminal and desktop', async ($, on) => {
-  project(on)
-  let filled = ''
-  on('prompt.fill', (_$, e) => {
-    filled = e.text
-    return { isFilled: true }
-  })
+  const project = fake(on)
   // Another mod's band row, which ours must keep
   on('ui.render', () => ({ type: 'Text', props: {}, children: ['drawn by another mod'] }))
   await $.command.run({ command: 'gtm-board', ...RUN })
 
-  const site = { scroll: { offset: 0, bodyRows: 30 }, view: {} }
   for (const surface of ['terminal', 'desktop'] as const) {
     const pane = await $.ui.mount({
       plugin: 'gtm-operator',
       surface,
       component: 'Pane',
       requestId: 'gtm-board',
-      props: { title: 'GTM board', isFocused: false, bodyColumns: 60, placement: 'dock', ...site },
+      props: PANE_PROPS,
     })
     expect(await pane.find({ type: 'Text', text: /2\/11 steps in place/ })).toBeDefined()
     expect(await pane.find({ type: 'Text', text: /Next: \/evp:evp/ })).toBeDefined()
     await pane.press({ key: 'fill' })
-    expect(filled).toBe('/evp:evp')
+    expect(project.fills.at(-1)).toBe('/evp:evp')
 
     const band = await $.ui.mount({
       plugin: 'gtm-operator',
       surface,
       component: 'AbovePrompt',
-      props: { hasSurvey: false, isWorking: false, maxRows: 3, bodyColumns: 100, ...site },
+      props: BAND_PROPS,
     })
     expect(await band.find({ type: 'Text', text: 'GTM 2/11' })).toBeDefined()
     expect(await band.find({ type: 'Text', text: 'drawn by another mod' })).toBeDefined()
@@ -128,8 +96,8 @@ test('the board pane and the band draw the next step on terminal and desktop', a
 })
 
 test('after /clear the board and the hidden band come back from the files and the store', async ($, on) => {
-  project(on)
-  on('store.get', ($, e) => ({ value: e.key === 'isBandHidden' ? true : undefined }))
+  const project = fake(on)
+  project.store.set('isBandHidden', true)
   on('classic.SessionStart', () => ({}))
   on('ui.render', () => ({ type: 'Text', props: {}, children: ['engine band'] }))
 
@@ -139,7 +107,7 @@ test('after /clear the board and the hidden band come back from the files and th
     plugin: 'gtm-operator',
     surface: 'terminal',
     component: 'AbovePrompt',
-    props: { hasSurvey: false, isWorking: false, maxRows: 3, bodyColumns: 100, scroll: { offset: 0, bodyRows: 3 }, view: {} },
+    props: BAND_PROPS,
   })
   expect(await band.find({ type: 'Text', text: /GTM \d+\/11/ })).toBeUndefined()
   const pane = await $.ui.mount({
@@ -147,14 +115,14 @@ test('after /clear the board and the hidden band come back from the files and th
     surface: 'terminal',
     component: 'Pane',
     requestId: 'gtm-board',
-    props: { title: 'GTM board', isFocused: false, bodyColumns: 60, placement: 'dock', scroll: { offset: 0, bodyRows: 30 }, view: {} },
+    props: PANE_PROPS,
   })
   expect(await pane.find({ type: 'Text', text: /2\/11 steps in place/ })).toBeDefined()
 })
 
 test('a guard that fails refuses the write to brand-config.json', async ($, on) => {
   // The first root lookup fails inside the guard; the catch handler's succeeds
-  project(on, 1)
+  fake(on, { failedRoots: 1 })
   let isWritten = false
   on('tool.call', () => {
     isWritten = true

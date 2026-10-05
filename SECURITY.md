@@ -3,11 +3,17 @@
 ## What this mod does on your machine
 
 - It runs inside Claude Code as a mod: `hooks/register.tsx` and `hooks/gtm.ts`. `claude plugin validate .` lists every hook and call; the README's "What it can reach" section mirrors it.
-- It reads `brand-config.json`, `SOUL.md`, `gtm/` and `drafts/` in your project root. It writes nothing in your project.
-- It saves one value, whether you hid the band, in Claude Code's plugin store under `~/.claude/plugins/store/`.
+- It reads `brand-config.json`, `SOUL.md`, `gtm/` and `drafts/` in your project root, and lists the folders where packs install (`packsDir`, `~/.claude/plugins/cache/`, the skills folders). It writes nothing in your project.
+- It runs the installed packs' own scripts: each pack's scorer on its draft, and for the views the pricing pack's waterfall and decoy check and the cold-email pack's spam lint, subject score and reply triage. `python3 <script> <your file> --json`, no shell, 20-second timeout. These are standard-library Python that read a file and print JSON; none opens a network connection. Turn all of it off with the `runScorers` setting.
+- The cold-email deliverability check runs only when you press its button: it looks up your sending domain's DNS records with `dig`, which does reach the network (DNS only).
+- It reads one environment variable, `HOME`, to find the plugin cache.
+- It saves whether you hid the band and, per project, the score history, the outcomes you log, and hashes of the PSP, EVP and pricing blocks, in Claude Code's plugin store under `~/.claude/plugins/store/`.
+- It runs a pack's slash command only when you ask: the **Run** or **Sprint** button, or the next step of a sprint you started. A sprint stops at the first failing draft.
+- It registers three read-only tools for Claude (`gtm_status`, `gtm_score`, `gtm_consistency`) and one read-only subagent (`gtm-operator:reviewer`, tools Read, Glob, Grep and those three).
+- It copies the weekly digest to your clipboard only when you press **Copy weekly digest**.
 - It refuses some Write and Edit calls to `brand-config.json` and `SOUL.md` (see the README's guard section). It never approves a tool call, so your permission rules and prompts apply as before.
 - It adds a short section to Claude's system prompt with the suite's state, built from your own files.
-- Network: none. It never calls `$.http.fetch`, starts a process, reads environment variables, or calls a model.
+- Network: none, except the DNS lookups of the deliverability check when you press its button. It never calls `$.http.fetch` or a model, and starts no process other than the packs' own scripts.
 - No telemetry. No credentials asked for or stored. Nothing is sent, posted or published.
 
 ## Reporting a vulnerability

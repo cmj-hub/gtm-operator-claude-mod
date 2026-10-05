@@ -1,8 +1,8 @@
 // The suite's state, read the way /gtm:next reads it (suite/skills/next/SKILL.md).
 import type { GtmBoard, GtmStep } from '../types'
 
-type Json = null | boolean | number | string | Json[] | { [key: string]: Json }
-type Config = { [key: string]: Json }
+export type Json = null | boolean | number | string | Json[] | { [key: string]: Json }
+export type Config = { [key: string]: Json }
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000
 

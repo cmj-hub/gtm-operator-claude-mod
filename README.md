@@ -4,7 +4,7 @@
 
 # GTM operator mod for Claude Code
 
-The GTM operator mod is a Claude Code mod that shows which go-to-market step you are on, names the next skill pack to run, and keeps Claude from overwriting the brand config every pack shares.
+The GTM operator mod is a Claude Code mod that scores every go-to-market draft with its own skill pack's scorer, names the next pack to run, and keeps Claude from overwriting the brand config every pack shares.
 
 ## In 60 seconds
 
@@ -28,13 +28,52 @@ Part of the GTM operator suite — `/plugin install gtm@gtm-operator-skills` ins
 
 | Where | What you see |
 |---|---|
-| Band above the prompt | `GTM 2/11  Next: /evp:evp — no value line yet  [Use] [Board] [Hide]`. Other mods' band rows stay above it. |
-| Status line | `GTM 2/11 · next /evp:evp` |
-| `/gtm-board` | A pane: operator, buyer, pain, value line, the 11 steps (✓ done, ▸ next, · open), and the install line for the next pack |
-| Toast | When a step completes: `GTM: Value line (EVP) done. Next: /prospect-list:who-to-contact` |
-| Claude's system prompt | Each turn Claude reads what is done, what is next, and the suite's merge rules |
+| Band above the prompt | `GTM 3/11  1 to fix  2 warnings  Next: /prospect-list:who-to-contact  [Use] [Run] [Board] [Hide]`. **Use** fills your prompt; **Run** runs the pack. Other mods' band rows stay above it. |
+| Status line | `GTM 3/11 · 1 draft to fix · next /prospect-list:who-to-contact` |
+| `/gtm-board`, Board tab | Every step with its score from its pack's own scorer (`37/100 · 11 fixes`, `pass`, `fail · 3 fixes`) and a score trend. Press a step to drill in. |
+| `/gtm-board`, Detail tab | The step's score breakdown, each fix, any SOUL.md phrases it uses, the draft text, and **Fix with Claude** (puts the pack command and the fixes in your prompt). |
+| `/gtm-board`, Health tab | Cross-pack warnings: drafts written before the PSP, EVP or price changed; a landing page that doesn't lead with the EVP or name the price tiers; a letter or sequence with none of the buyer's words; roles from `icp.role_targets` the prospect list leaves out. Each has **Fix with Claude**. |
+| `/gtm-board`, Views tab | Six pack views: **Pricing** (pocket-price waterfall and tier contrast check), **Prospects** (call / hold / drop), **Cold email** (lint and subject scores, send rhythm, reply triage, deliverability), **EVP** (awareness ladder), **GEO** (kill-date countdown, citations by engine, blocked crawlers), **Founder** (posts per pillar, 7-day warning). |
+| `/gtm-board`, Analytics tab | Score trend per pack, how many drafts it took to pass and how long, fixes resolved; an outcome log (replies and meetings each week, tied to the cold email that was live); **Copy weekly digest**. |
+| `/gtm-score [pack]`, `/gtm-health`, `/gtm-digest` | The scores, the cross-pack warnings and the weekly digest as text, for the VS Code extension, `claude -p` and cloud sessions. |
+| `/gtm-sprint [to <step>]` | Runs the packs in order. Each pack runs only after the one before passes its scorer; a failing draft pauses the sprint until you fix it and `/gtm-sprint resume`. `/gtm-sprint stop` ends it. The **Sprint** button on the board starts one too. |
+| Tools Claude can call | `gtm_status`, `gtm_score` (one pack, now) and `gtm_consistency`, so Claude checks its own draft before saying it's done. |
+| `gtm-operator:reviewer` | A read-only subagent that reviews one draft against the PSP, the EVP, SOUL.md and its scorer, and returns at most five changes. |
+| Toast | When you save a draft: `GTM First touch: fail · 3 fixes · quote at least 3 words of the signal…`. When a step completes: `GTM: Value line (EVP) done. Next: …` |
+| Claude's system prompt | Each turn Claude reads what is done, what is next, the merge rules, and which drafts fail their scorer with the first fix. |
 
-It re-checks every 30 seconds and after any write or shell command. **Hide** is remembered across sessions; **Show band** in the pane brings it back.
+It re-checks every 30 seconds and after any write or shell command, and re-scores a draft only when it changes. Score history is kept per project across sessions. **Hide** is remembered across sessions; **Show band** in the pane brings it back.
+
+## How scoring works
+
+Each pack ships a scorer: standard-library Python that prints JSON. The mod finds the installed pack, runs its scorer on your draft (`brand-config.json` for the PSP and EVP, `gtm/<pack>.json` for most packs, the newest file in `drafts/` for founder posts), and shows the result. It never re-implements a pack's rubric.
+
+It looks for the packs in this order: the `packsDir` setting, the Claude Code plugin cache (`~/.claude/plugins/cache/<marketplace>/<plugin>/<version>/`, newest version first), then the skills folders (`.claude/skills/` in the project, `~/.claude/skills/`, `~/.agents/skills/`). A pack it cannot find shows `unknown` with its install line; nothing breaks.
+
+## Settings
+
+Set these in `/config` (or `pluginConfigs["gtm-operator"].options` in settings):
+
+| Setting | Default | What it does |
+|---|---|---|
+| `runScorers` | on | Score drafts with the packs' scorers. Off: progress only, nothing runs. |
+| `minScore` | 0 (off) | Refuse a Write or Edit to a `gtm/` or `drafts/` draft that scores below this, with the fixes in the refusal. |
+| `packsDir` | empty | A folder holding the pack repos side by side; searched first. |
+| `python` | `python3` | The command the scorers run with. |
+
+## Cross-pack checks and views
+
+The checks are heuristics, so they warn and never block. A draft counts as stale when the `psp`, `evp` or `pricing` block in `brand-config.json` (or `gtm/price.json`) changed after the draft was saved; the mod notices changes by hashing those blocks, so the first time it sees a project nothing is stale.
+
+The views run the packs' own tools: `pocket_price_waterfall.py` on `gtm/waterfall.csv`, `decoy_validator.py` on `gtm/tiers.json`, `spam_word_lint.py` and `score_subject_line.py` on `gtm/letter.json`, `score_reply.py` on `gtm/replies.jsonl`. The deliverability check (`check_deliverability.py`, DNS lookups with `dig`) runs only when you press its button.
+
+## The guided sprint
+
+`/gtm-sprint` puts the first pack's command in your prompt; send it. After each turn the mod scores that pack's draft. A pass runs the next pack by itself; a fail pauses with the reason. Claude Code doesn't let a slash command start a turn by itself, which is why the first step (and `resume`) go through your prompt. The **Sprint** button starts straight away.
+
+## Voice check
+
+Bullets under `## Phrases I refuse` in your SOUL.md are flagged in any draft, in every pack, on the board, in the save toast, and in what Claude reads.
 
 ## The guard: merge, never overwrite
 
@@ -44,7 +83,7 @@ It re-checks every 30 seconds and after any write or shell command. **Hide** is 
 - leave `brand-config.json` as anything but one JSON object,
 - remove an existing `##` section from `SOUL.md`.
 
-The refusal names the fields and tells Claude to ask you first. If the check itself fails, the write to those two files is refused rather than let through. Once you approve a change, run `/gtm-guard off`; `/gtm-guard on` restores it.
+The refusal names the fields and tells Claude to ask you first. The optional score gate (`minScore`) works the same way for drafts. If the check itself fails, the write to those two files is refused rather than let through. Once you approve a change, run `/gtm-guard off`; `/gtm-guard on` restores it.
 
 ## The steps it walks
 
@@ -87,7 +126,7 @@ Panes and the band draw in the terminal and the Desktop app's Code tab. In the V
 
 ## What this mod will not do
 
-It will not run a pack for you, write your drafts, or pick this quarter's buyer. It reads the files the packs write and tells you what is missing. It sends nothing, posts nothing, and changes no file in your project.
+It will not pick this quarter's buyer or write a draft itself. It reads the files the packs write, runs the packs' own scorers on them, and tells you what is missing or weak; **Run** and **Sprint** start a pack, and Claude writes the draft the way that pack says. The mod sends nothing, posts nothing, and changes no file in your project.
 
 ## What is a Claude Code mod?
 
@@ -113,9 +152,9 @@ Mods run in Claude Code only. In the VS Code extension the guard and `/gtm-board
 
 What `claude plugin validate .` reports, so you can review it before installing:
 
-- **Hooks:** `session.start`, `classic.SessionStart` (after `/clear`, `/resume`, `/branch`), `command.run` (its two commands), `tool.call` (Write and Edit to guard, every call to refresh), `prompt.compose`, `ui.render` (the band and its own pane).
-- **Calls:** `$.fs.read`, `$.fs.list`, `$.fs.exists` (your project's `brand-config.json`, `SOUL.md`, `gtm/`, `drafts/`), `$.store.get` / `$.store.set` (one key, `isBandHidden`), and display calls.
-- **Never:** `$.fs.write`, `$.process`, `$.http.fetch`, `$.env`, `$.model`, `$.prompt.submit`.
+- **Hooks:** `session.start`, `classic.SessionStart` (after `/clear`, `/resume`, `/branch`), `command.run` (its six commands), `tool.call` (Write and Edit to guard and gate, every call to refresh and score, and its own three tools), `turn.complete` (moves a sprint on), `prompt.compose`, `ui.render` (the band and its own pane).
+- **Calls:** `$.fs.read`, `$.fs.list`, `$.fs.exists`, `$.fs.stat` (your project's `brand-config.json`, `SOUL.md`, `gtm/`, `drafts/`, and the folders where packs install); `$.process.run` (only `python3 <pack script> ... --json`: the installed packs' own scorers and the view tools listed above, 20-second timeout; off with `runScorers`. The deliverability check makes DNS lookups through `dig`, and only when you press its button); `$.env.get` (`HOME` only, to find the plugin cache); `$.store.get` / `$.store.set` (`isBandHidden`, and per project the score history, the outcome log, and the hashes of the PSP, EVP and pricing blocks); `$.tool.register` (its three tools) and `$.agent.register` (the reviewer); `$.command.run` (only the pack commands you start with **Run**, **Sprint** or a sprint step); `$.prompt.fill`; `$.ui.copy` (the digest, when you press its button); and display calls.
+- **Never:** `$.fs.write`, `$.http.fetch`, `$.env.set`, `$.model`, `$.prompt.submit`.
 
 ## On the site
 
@@ -143,11 +182,11 @@ claude plugin test .
 tsc -p .        # after Claude Code has loaded the mod once (it writes .claude-plugin/types/)
 ```
 
-`hooks/register.tsx` holds the hooks, `hooks/gtm.ts` the step walk and merge checks, `types/index.d.ts` the `$.state` contract, `tests/gtm.test.ts` the tests. The images in `assets/` are rendered from `spec.json` (with `card.mjs`), `lockup.html`, `demo.html` and `logo.svg`.
+`hooks/register.tsx` holds the hooks; `hooks/gtm.ts` the step walk and merge checks; `hooks/packs.ts` the ten packs' scorers and drafts; `hooks/score.ts` turns each scorer's JSON into one shape; `hooks/locate.ts` says where packs install; `hooks/voice.ts` and `hooks/history.ts` the voice check and score history; `hooks/drift.ts` the cross-pack checks; `hooks/views.ts` the pack views' data; `hooks/analytics.ts` the stats, digest, outcomes and sprint steps; `types/index.d.ts` the `$.state` contract. Tests are in `tests/`, with the scorers' real output recorded in `tests/fixtures.ts`. `docs/ROADMAP.md` is the plan through v0.5. The images in `assets/` are rendered from `spec.json` (with `card.mjs`), `lockup.html`, `demo.html` and `logo.svg`.
 
 ## Privacy and security
 
-The one thing it saves is whether you hid the band, in Claude Code's plugin store under `~/.claude/plugins/store/`. Each turn it adds a short section to Claude's system prompt with the suite's state; that text comes from your own files. No network, no telemetry, no credentials. See [SECURITY.md](SECURITY.md).
+It saves whether you hid the band and, per project, the score history and the outcomes you log, in Claude Code's plugin store under `~/.claude/plugins/store/`. Scoring runs the packs' own Python scorers on your machine; they read your draft and print JSON, with no network. Each turn it adds a short section to Claude's system prompt with the suite's state; that text comes from your own files. No network, no telemetry, no credentials. See [SECURITY.md](SECURITY.md).
 
 ## License
 
