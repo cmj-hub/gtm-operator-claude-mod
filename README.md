@@ -67,7 +67,7 @@ All of these are captured from Claude Code 2.1.289 in a terminal, running this m
 <td><b>Analytics.</b> Trends, drafts to pass, outcomes.<br><img src="./assets/screens/analytics.png" alt="The Analytics tab: score history per pack, the founder post going from 37 to 100 after two failing drafts, nine fixes resolved, and replies and meetings imported from a CSV."></td>
 </tr>
 <tr>
-<td><b>Pricing view.</b> Pocket-price waterfall and tier check.<br><img src="./assets/screens/view-pricing.png" alt="The Pricing view: pocket-price waterfall bars per customer with the biggest leaks, and the tier contrast check at 100 out of 100."></td>
+<td><b>Pricing view.</b> Runs the waterfall and tier checks against your own private inputs. The former sample-data screenshot has been withdrawn.</td>
 <td><b>Cold email view.</b> Lint, subject, rhythm, replies.<br><img src="./assets/screens/view-cold-email.png" alt="The Cold email view: first touch word count and subject, spam lint 100 out of 100, subject line 87 out of 100, the Monday, Wednesday, Friday rhythm, reply triage counts and a deliverability button."></td>
 </tr>
 <tr>
@@ -233,7 +233,7 @@ claude plugin eval . --scaffold --trust-plugin \
 
 Measured 2026-10-05, two runs per arm.
 
-`hooks/register.tsx` holds the hooks; `hooks/gtm.ts` the step walk and merge checks; `hooks/packs.ts` the ten packs' scorers and drafts; `hooks/score.ts` turns each scorer's JSON into one shape; `hooks/locate.ts` says where packs install; `hooks/voice.ts` and `hooks/history.ts` the voice check and score history; `hooks/drift.ts` the cross-pack checks; `hooks/views.ts` the pack views' data; `hooks/analytics.ts` the stats, digest, outcomes and sprint steps; `types/index.d.ts` the `$.state` contract. Tests are in `tests/`, with the scorers' real output recorded in `tests/fixtures.ts`. `docs/ROADMAP.md` is the plan through v0.6. `evals/` holds the `claude plugin eval` suite (see below). The images in `assets/` are rendered from `spec.json` (with `card.mjs`), `lockup.html`, `demo.html` and `logo.svg`; the ones in `assets/screens/` are real terminal captures (`tmux capture-pane -e`) turned into pages by `assets/screens/ansi2html.py` and screenshotted.
+`hooks/register.tsx` holds the hooks; `hooks/gtm.ts` the step walk and merge checks; `hooks/packs.ts` the ten packs' scorers and drafts; `hooks/score.ts` turns each scorer's JSON into one shape; `hooks/locate.ts` says where packs install; `hooks/voice.ts` and `hooks/history.ts` the voice check and score history; `hooks/drift.ts` the cross-pack checks; `hooks/views.ts` the pack views' data; `hooks/analytics.ts` the stats, digest, outcomes and sprint steps; `types/index.d.ts` the `$.state` contract. Tests are in `tests/`, with scorer-output contracts in `tests/fixtures.ts`; the one-account waterfall mock is explicitly synthetic and does not reproduce withdrawn inputs. `docs/ROADMAP.md` is the plan through v0.6. `evals/` holds the `claude plugin eval` suite (see below). The images in `assets/` are rendered from `spec.json` (with `card.mjs`), `lockup.html`, `demo.html` and `logo.svg`; the ones in `assets/screens/` are real terminal captures (`tmux capture-pane -e`) turned into pages by `assets/screens/ansi2html.py` and screenshotted.
 
 ## Privacy and security
 
@@ -246,3 +246,7 @@ MIT. See [LICENSE](./LICENSE).
 ## About
 
 Built by [Jay Mount Consulting](https://jaymountconsulting.com).
+
+## Public sample withdrawal
+
+The bundled waterfall dataset, its derived four-account test capture and its pricing screenshot have been withdrawn. The optional waterfall view remains available for an operator's own authorized private input. No replacement dataset is published. Old commits, forks and previously downloaded releases may retain historical files.
