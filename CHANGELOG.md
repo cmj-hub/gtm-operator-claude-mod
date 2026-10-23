@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.6.2] — 2026-10-23
+
+- Withdraw the bundled waterfall CSV, derived four-account mock output and pricing screenshot. Preserve optional private-input behavior and replace the test contract with a new labelled one-account arithmetic mock, not a reformatted copy of the withdrawn rows.
+
 ## [0.6.1] — 2026-10-05
 
 Found while capturing the screens in a live session.
@@ -20,7 +24,7 @@ Found while capturing the screens in a live session.
 
 ### Fixed (found running the mod in a real terminal)
 - The band no longer wraps its labels into two-line columns beside a docked pane; it drops the reason for the next step when the row is short.
-- The pricing waterfall shows whole percents (`-28%`, `0%`, `+64%`), not `-0%` or `+63.78%`.
+- The pricing waterfall shows rounded whole percentages and the correct sign, without spurious negative zero or raw decimal precision.
 - The Detail tab shows a JSON draft as labelled lines (`primary_pain: ...`) instead of one run-on line.
 
 ## [0.5.1] — 2026-10-05

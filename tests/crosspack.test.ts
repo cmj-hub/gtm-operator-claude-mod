@@ -62,14 +62,14 @@ describe('cross-pack checks', () => {
 describe('view models', () => {
   test('pricing: the waterfall totals and the decoy checks', () => {
     const view = pricingView(FIXTURES.waterfall?.stdout, FIXTURES['decoy-broken']?.stdout, draft({ value_metric: 'per seat', contrast_set: ['A', 'B'] }))
-    expect(view.customers[0]).toMatchObject({ id: 'acme', list: 14400, pocket: 10368, leakPct: 28 })
-    expect(view.byStep[0]?.name).toBe('ramp')
+    expect(view.customers[0]).toMatchObject({ id: 'synthetic-test-account', list: 100, pocket: 75, leakPct: 25 })
+    expect(view.byStep[0]?.name).toBe('test-only-discount')
     expect(view.checks.some(check => !check.passed)).toBe(true)
     expect(view.valueMetric).toBe('per seat')
   })
 
   test('pricing: the leak is a whole percent, signed by which way the price moved', () => {
-    expect([28, 32.72, 0, -0.2, -63.78].map(leakLabel)).toEqual(['-28%', '-33%', '0%', '0%', '+64%'])
+    expect([25, 12.34, 0, -0.2, -40.1].map(leakLabel)).toEqual(['-25%', '-12%', '0%', '0%', '+40%'])
   })
 
   test('prospects: one column per slot', () => {
@@ -154,7 +154,7 @@ test('the pricing and cold-email views run the packs\' own tools', async ($, on)
     files: {
       'brand-config.json': JSON.stringify({ ...CONFIG, infrastructure: { sending_domain: 'outreach.acme.com' } }),
       'gtm/price.json': JSON.stringify({ price: 1200, value_metric: 'per seat', contrast_set: ['Starter', 'Growth', 'Scale'] }),
-      'gtm/waterfall.csv': 'customer_id,list_price\nacme,1200\n',
+      'gtm/waterfall.csv': 'opaque private input: the fake tool provides native test results',
       'gtm/tiers.json': JSON.stringify({ tiers: [] }),
       'gtm/letter.json': JSON.stringify({ public_signal: 'Acme posted a role.', letter: 'Acme posted a role. Want the page?' }),
     },
@@ -165,7 +165,7 @@ test('the pricing and cold-email views run the packs\' own tools', async ($, on)
     await pane.press({ key: 'tab-views' })
     await pane.press({ key: 'view-pricing' })
     expect(await pane.find({ type: 'Text', text: /^Pocket-price waterfall: \$\d/ })).toBeDefined()
-    expect(await pane.find({ type: 'Text', text: /^acme\s+█/ })).toBeDefined()
+    expect(await pane.find({ type: 'Text', text: /^synthetic-test-account\s+█/ })).toBeDefined()
     expect(await pane.find({ type: 'Text', text: /^Tier contrast check: 100\/100/ })).toBeDefined()
 
     await pane.press({ key: 'view-cold-email' })
